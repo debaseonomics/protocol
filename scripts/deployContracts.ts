@@ -1,5 +1,5 @@
 import { run, ethers } from '@nomiclabs/buidler';
-import { FACTORY_ADDRESS, INIT_CODE_HASH, WETH } from '@uniswap/sdk';
+import { FACTORY_ADDRESS, INIT_CODE_HASH } from '@uniswap/sdk';
 import { pack, keccak256 } from '@ethersproject/solidity';
 import { getCreate2Address } from '@ethersproject/address';
 
@@ -13,10 +13,6 @@ import DebaseArtifact from '../artifacts/Debase.json';
 import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
 import OrchestratorArtifact from '../artifacts/Orchestrator.json';
 
-import USDCArtifact from '../artifacts/USDC.json';
-import YCurveArtifact from '../artifacts/YCurve.json';
-import UNIArtifact from '../artifacts/UNI.json';
-
 import { DegovFactory } from '../type/DegovFactory';
 import { GovernorAlphaFactory } from '../type/GovernorAlphaFactory';
 import { TimelockFactory } from '../type/TimelockFactory';
@@ -27,9 +23,6 @@ import { DebaseFactory } from '../type/DebaseFactory';
 import { DebasePolicyFactory } from '../type/DebasePolicyFactory';
 import { OrchestratorFactory } from '../type/OrchestratorFactory';
 
-import { UsdcFactory } from '../type/UsdcFactory';
-import { YCurveFactory } from '../type/YCurveFactory';
-import { UniFactory } from '../type/UniFactory';
 import { promises } from 'fs';
 
 async function main() {
@@ -71,21 +64,6 @@ async function main() {
 		OrchestratorArtifact.bytecode,
 		signer[0]
 	) as any) as OrchestratorFactory;
-	const USDCFactory = (new ethers.ContractFactory(
-		USDCArtifact.abi,
-		USDCArtifact.bytecode,
-		signer[0]
-	) as any) as UsdcFactory;
-	const YCurveFactory = (new ethers.ContractFactory(
-		YCurveArtifact.abi,
-		YCurveArtifact.bytecode,
-		signer[0]
-	) as any) as YCurveFactory;
-	const uniFactory = (new ethers.ContractFactory(
-		UNIArtifact.abi,
-		UNIArtifact.bytecode,
-		signer[0]
-	) as any) as UniFactory;
 
 	let balance = (await signer[0].getBalance()).toString();
 	console.log('Balance before deploy', ethers.utils.formatEther(balance));
@@ -96,14 +74,14 @@ async function main() {
 		debasePolicy: '',
 		governorAlpha: '',
 		timelock: '',
-		debaseUSDCPool: '',
+		debaseDAIPool: '',
 		debaseYCurvePool: '',
 		degovUNIPool: '',
 		orchestrator: '',
-		USDC: '',
-		YCurve: '',
-		UNI: '',
-		debaseUSDCLP: ''
+		DAI: '0x6b175474e89094c44da98b954eedeac495271d0f',
+		YCurve: '0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8',
+		UNI: '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
+		debaseDAILP: ''
 	};
 
 	try {
@@ -115,24 +93,18 @@ async function main() {
 		const timelock = await timeLockFactory.deploy();
 		const orchestrator = await orchestratorFactory.deploy();
 
-		const debaseUSDCPool = await stakingPoolFactory.deploy();
+		const debaseDAIPool = await stakingPoolFactory.deploy();
 		const debaseYCurvePool = await stakingPoolFactory.deploy();
 		const degovUNIPool = await stakingPoolFactory.deploy();
-
-		const USDC = await USDCFactory.deploy(ethers.utils.parseEther('10000'));
-		const YCurve = await YCurveFactory.deploy(ethers.utils.parseEther('10000'));
-		const UNI = await uniFactory.deploy(ethers.utils.parseEther('10000'));
 
 		balance = (await signer[0].getBalance()).toString();
 		console.log('Balance after deploy', ethers.utils.formatEther(balance));
 
-		const debaseUSDCLP = getCreate2Address(
-			'0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
-			keccak256([ 'bytes' ], [ pack([ 'address', 'address' ], [ debase.address, USDC.address ]) ]),
+		const debaseDAILP = getCreate2Address(
+			FACTORY_ADDRESS,
+			keccak256([ 'bytes' ], [ pack([ 'address', 'address' ], [ debase.address, contractAddresses.DAI ]) ]),
 			INIT_CODE_HASH
 		);
-
-		console.log('Addr', debaseUSDCLP, debase.address, USDC.address);
 
 		contractAddresses.degov = degov.address;
 		contractAddresses.debase = debase.address;
@@ -142,15 +114,11 @@ async function main() {
 		contractAddresses.timelock = timelock.address;
 		contractAddresses.orchestrator = orchestrator.address;
 
-		contractAddresses.debaseUSDCPool = debaseUSDCPool.address;
+		contractAddresses.debaseDAIPool = debaseDAIPool.address;
 		contractAddresses.debaseYCurvePool = debaseYCurvePool.address;
 		contractAddresses.degovUNIPool = degovUNIPool.address;
 
-		contractAddresses.USDC = USDC.address;
-		contractAddresses.YCurve = YCurve.address;
-		contractAddresses.UNI = UNI.address;
-
-		contractAddresses.debaseUSDCLP = debaseUSDCLP;
+		contractAddresses.debaseDAILP = debaseDAILP;
 
 		const data = JSON.stringify(contractAddresses);
 		await promises.writeFile('contracts.json', data);

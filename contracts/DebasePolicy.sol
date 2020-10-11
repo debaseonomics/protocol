@@ -150,7 +150,7 @@ contract DebasePolicy is Ownable, Initializable {
     }
 
     /**
-     * @notice Function to launch the debase oracle which can only happen after the debase USDC pool has been launched.
+     * @notice Function to launch the debase oracle which can only happen after the debase DAI pool has been launched.
      *         So oracle deployer can deploy this oracle but is only capable of doing it once.
      * @param oracle_ Address of the debase oracle
      */

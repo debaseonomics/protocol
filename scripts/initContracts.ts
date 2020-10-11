@@ -3,28 +3,18 @@ import { run, ethers } from '@nomiclabs/buidler';
 import DegovArtifact from '../artifacts/Degov.json';
 import GovernorAlphaArtifact from '../artifacts/GovernorAlpha.json';
 import TimelockArtifact from '../artifacts/Timelock.json';
-
 import StakingPoolArtifact from '../artifacts/StakingPool.json';
-import UNIArtifact from '../artifacts/UNI.json';
-
 import DebaseArtifact from '../artifacts/Debase.json';
 import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
 import OrchestratorArtifact from '../artifacts/Orchestrator.json';
-import USDCArtifact from '../artifacts/USDC.json';
-import YCurveArtifact from '../artifacts/YCurve.json';
 
 import { Degov } from '../type/Degov';
 import { GovernorAlpha } from '../type/GovernorAlpha';
 import { Timelock } from '../type/Timelock';
-
 import { StakingPool } from '../type/StakingPool';
-
 import { Debase } from '../type/Debase';
 import { DebasePolicy } from '../type/DebasePolicy';
 import { Orchestrator } from '../type/Orchestrator';
-import { Uni } from '../type/Uni';
-import { Usdc } from '../type/Usdc';
-import { YCurve } from '../type/YCurve';
 import { promises } from 'fs';
 import { WETH } from '@uniswap/sdk';
 
@@ -52,9 +42,9 @@ async function main() {
 			signer[0]
 		)) as any) as Timelock;
 
-		const debaseUSDCPool = ((await ethers.getContractAt(
+		const debaseDAIPool = ((await ethers.getContractAt(
 			StakingPoolArtifact.abi,
-			dataParse['debaseUSDCPool'],
+			dataParse['debaseDAIPool'],
 			signer[0]
 		)) as any) as StakingPool;
 		const debaseYCurvePool = ((await ethers.getContractAt(
@@ -78,43 +68,38 @@ async function main() {
 			dataParse['orchestrator'],
 			signer[0]
 		)) as any) as Orchestrator;
-		const usdc = ((await ethers.getContractAt(USDCArtifact.abi, dataParse['USDC'], signer[0])) as any) as Usdc;
-		const yCurve = ((await ethers.getContractAt(
-			YCurveArtifact.abi,
-			dataParse['YCurve'],
-			signer[0]
-		)) as any) as YCurve;
-		const uni = ((await ethers.getContractAt(UNIArtifact.abi, dataParse['UNI'], signer[0])) as any) as Uni;
-		const debaseUSDCLP = dataParse['debaseUSDCLP'];
 
-		// const weth = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
-		const two_hour = 2 * 60 * 60;
-		const four_hour = 4 * 60 * 60;
-		const one_day = 24 * 60 * 60;
-		const two_days = 48 * 60 * 60;
-		const three_days = 72 * 60 * 60;
-		const four_days = 96 * 60 * 60;
+		const UNI = dataParse['UNI'];
+		const YCurve = dataParse['YCurve'];
+		const DAI = dataParse['DAI'];
+		const debaseDAILP = dataParse['debaseDAILP'];
+
+		const one_hour = 60 * 60;
+		const one_day = 24 * one_hour;
+		const two_days = 2 * one_day;
+		const three_days = 3 * one_day;
+		const four_days = 4 * one_day;
 		const three_weeks = 21 * one_day;
 		const rebaseRequiredSupplyRatio = 1;
 
 		const debaseYCurvePoolParams = {
 			ratio: 25,
-			halvingDuration: four_hour,
+			halvingDuration: one_day,
 			fairDistribution: true,
 			fairDistributionTokenLimit: 10000,
 			fairDistributionTimeLimit: one_day,
 			manualPoolStart: false,
-			startTimeOffset: 1
+			startTimeOffset: one_hour
 		};
 
-		const debaseUSDCPoolParams = {
+		const debaseDAIPoolParams = {
 			ratio: 75,
-			halvingDuration: four_hour,
+			halvingDuration: three_days,
 			fairDistribution: false,
 			fairDistributionTokenLimit: 0,
 			fairDistributionTimeLimit: 0,
 			manualPoolStart: false,
-			startTimeOffset: two_hour
+			startTimeOffset: one_hour
 		};
 
 		const degovUNIPoolParams = {
@@ -124,7 +109,7 @@ async function main() {
 			fairDistributionTokenLimit: 5000,
 			fairDistributionTimeLimit: two_days,
 			manualPoolStart: true,
-			startTimeOffset: two_hour
+			startTimeOffset: 0
 		};
 
 		let balance = (await signer[0].getBalance()).toString();
@@ -135,8 +120,8 @@ async function main() {
 		transaction = await debase.initialize(
 			debaseYCurvePool.address,
 			debaseYCurvePoolParams.ratio,
-			debaseUSDCPool.address,
-			debaseUSDCPoolParams.ratio,
+			debaseDAIPool.address,
+			debaseDAIPoolParams.ratio,
 			debasePolicy.address
 		);
 		transaction.wait(1);
@@ -145,7 +130,7 @@ async function main() {
 		await debaseYCurvePool.initialize(
 			'Debase/YCurve Pool', //name
 			debase.address, // Reward Token
-			yCurve.address, // Stake Token
+			YCurve, // Stake Token
 			orchestrator.address, // Orchestrator
 			debaseYCurvePoolParams.ratio, // Pool Ratio
 			debaseYCurvePoolParams.halvingDuration, // Duration
@@ -155,23 +140,23 @@ async function main() {
 			debaseYCurvePoolParams.manualPoolStart, // Manual start pool
 			debaseYCurvePoolParams.startTimeOffset // Start Time offset
 		);
-		await debaseUSDCPool.initialize(
-			'Debase/USDC Pool',
+		await debaseDAIPool.initialize(
+			'Debase/DAI Pool',
 			debase.address,
-			debaseUSDCLP,
+			debaseDAILP,
 			orchestrator.address,
-			debaseUSDCPoolParams.ratio, // Pool Ratio
-			debaseUSDCPoolParams.halvingDuration, // Duration
-			debaseUSDCPoolParams.fairDistribution, // Fair flag
-			debaseUSDCPoolParams.fairDistributionTokenLimit, // Fair token limit
-			debaseUSDCPoolParams.fairDistributionTimeLimit, // Fair token time limit
-			debaseUSDCPoolParams.manualPoolStart, // Manual start pool
-			debaseUSDCPoolParams.startTimeOffset // Start Time offset
+			debaseDAIPoolParams.ratio, // Pool Ratio
+			debaseDAIPoolParams.halvingDuration, // Duration
+			debaseDAIPoolParams.fairDistribution, // Fair flag
+			debaseDAIPoolParams.fairDistributionTokenLimit, // Fair token limit
+			debaseDAIPoolParams.fairDistributionTimeLimit, // Fair token time limit
+			debaseDAIPoolParams.manualPoolStart, // Manual start pool
+			debaseDAIPoolParams.startTimeOffset // Start Time offset
 		);
 		await degovUNIPool.initialize(
 			'Degov/UNI Pool',
 			degov.address,
-			uni.address,
+			UNI,
 			orchestrator.address,
 			degovUNIPoolParams.ratio, // Pool Ratio
 			degovUNIPoolParams.halvingDuration, // Duration
@@ -187,15 +172,15 @@ async function main() {
 			debase.address,
 			debasePolicy.address,
 			debaseYCurvePool.address,
-			debaseUSDCPool.address,
+			debaseDAIPool.address,
 			degovUNIPool.address,
 			rebaseRequiredSupplyRatio,
 			three_weeks
 		);
 
-		await orchestrator.addPair(debase.address, usdc.address);
-		await orchestrator.addPair(debase.address, yCurve.address);
-		await orchestrator.addPair(debase.address, WETH[4].address);
+		await orchestrator.addPair(debase.address, DAI);
+		await orchestrator.addPair(debase.address, YCurve);
+		await orchestrator.addPair(debase.address, WETH[1].address);
 
 		balance = (await signer[0].getBalance()).toString();
 		console.log('Balance after init', ethers.utils.formatEther(balance));

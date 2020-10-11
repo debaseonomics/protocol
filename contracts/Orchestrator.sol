@@ -35,7 +35,7 @@ contract Orchestrator is Ownable, Initializable {
     // Stable ordering is not guaranteed.
     DebaseI public debase;
     DebasePolicyI public debasePolicy;
-    StakingPoolI public debaseUSDCPool;
+    StakingPoolI public debaseDAIPool;
     StakingPoolI public debaseYCurvePool;
     StakingPoolI public degovUNIPool;
     bool public rebaseStarted;
@@ -88,7 +88,7 @@ contract Orchestrator is Ownable, Initializable {
     function initialize(
         address debase_,
         address debasePolicy_,
-        address debaseUSDCPool_,
+        address debaseDAIPool_,
         address debaseYCurvePool_,
         address degovUNIPool_,
         uint256 requiredSupplyRatio,
@@ -97,7 +97,7 @@ contract Orchestrator is Ownable, Initializable {
         debase = DebaseI(debase_);
         debasePolicy = DebasePolicyI(debasePolicy_);
 
-        debaseUSDCPool = StakingPoolI(debaseUSDCPool_);
+        debaseDAIPool = StakingPoolI(debaseDAIPool_);
         debaseYCurvePool = StakingPoolI(debaseYCurvePool_);
         degovUNIPool = StakingPoolI(degovUNIPool_);
 
@@ -134,7 +134,7 @@ contract Orchestrator is Ownable, Initializable {
         // Rebase will only be called when 95% of the total supply has been distributed or current time is 3 weeks since the orchestrator was deployed.
         // To stop the rebase from getting stuck if no enough rewards are distributed. This will also start the degov/debase pool reward drops
         if (rebaseStarted == false) {
-            uint256 rewardsDistributed = debaseUSDCPool.totalRewards().add(
+            uint256 rewardsDistributed = debaseDAIPool.totalRewards().add(
                 debaseYCurvePool.totalRewards()
             );
 

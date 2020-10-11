@@ -76,21 +76,21 @@ contract Debase is ERC20, Initializable {
     constructor() public ERC20("Debase", "DEBASE", uint8(DECIMALS)) {}
 
     /**
-     * @notice Initializes with the policy,YCurve,USDC pool as parameters. 
+     * @notice Initializes with the policy,YCurve,DAI pool as parameters. 
                The function then sets the total supply to the initial supply and calculates the gon per fragment. 
-               It also sets the value and the gons for both the YCurve and USDC reward pools.
+               It also sets the value and the gons for both the YCurve and DAI reward pools.
      * @param debaseYCurvePool_ Address of the Debase YCurve pool contract
-     * @param debaseUSDCPool_ Address of the Debase USDC pool contract
+     * @param debaseDAIPool_ Address of the Debase DAI pool contract
      * @param debasePolicy_ Address of the Debase policy contract
      */
     function initialize(
         address debaseYCurvePool_,
         uint256 debaseYCurveTotalRatio,
-        address debaseUSDCPool_,
-        uint256 debaseUSDCTotalRatio,
+        address debaseDAIPool_,
+        uint256 debaseDAITotalRatio,
         address debasePolicy_
     ) external initializer {
-        require(debaseUSDCTotalRatio.add(debaseYCurveTotalRatio) == 100);
+        require(debaseDAITotalRatio.add(debaseYCurveTotalRatio) == 100);
 
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
@@ -104,16 +104,16 @@ contract Debase is ERC20, Initializable {
             _gonsPerFragment
         );
 
-        uint256 debaseUSDCPoolVal = _totalSupply.mul(debaseUSDCTotalRatio).div(
+        uint256 debaseDAIPoolVal = _totalSupply.mul(debaseDAITotalRatio).div(
             100
         );
-        uint256 debaseUSDCPoolGons = debaseUSDCPoolVal.mul(_gonsPerFragment);
+        uint256 debaseDAIPoolGons = debaseDAIPoolVal.mul(_gonsPerFragment);
 
         _gonBalances[debaseYCurvePool_] = debaseYCurvePoolGons;
-        _gonBalances[debaseUSDCPool_] = debaseUSDCPoolGons;
+        _gonBalances[debaseDAIPool_] = debaseDAIPoolGons;
 
         emit Transfer(address(0x0), debaseYCurvePool_, debaseYCurvePoolVal);
-        emit Transfer(address(0x0), debaseUSDCPool_, debaseUSDCPoolVal);
+        emit Transfer(address(0x0), debaseDAIPool_, debaseDAIPoolVal);
     }
 
     /**
