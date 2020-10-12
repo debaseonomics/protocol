@@ -80,7 +80,8 @@ async function main() {
 		const three_days = 3 * one_day;
 		const four_days = 4 * one_day;
 		const three_weeks = 21 * one_day;
-		const rebaseRequiredSupplyRatio = 1;
+
+		const rebaseRequiredSupplyRatio = 95;
 
 		const debaseYCurvePoolParams = {
 			ratio: 25,
