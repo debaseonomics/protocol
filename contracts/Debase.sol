@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.6;
+pragma solidity >=0.6.6;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -76,44 +76,43 @@ contract Debase is ERC20, Initializable {
     constructor() public ERC20("Debase", "DEBASE", uint8(DECIMALS)) {}
 
     /**
-     * @notice Initializes with the policy,YCurve,DAI pool as parameters. 
+     * @notice Initializes with the policy,Dai,DaiLp pool as parameters. 
                The function then sets the total supply to the initial supply and calculates the gon per fragment. 
-               It also sets the value and the gons for both the YCurve and DAI reward pools.
-     * @param debaseYCurvePool_ Address of the Debase YCurve pool contract
-     * @param debaseDAIPool_ Address of the Debase DAI pool contract
+               It also sets the value and the gons for both the Dai and DaiLp reward pools.
+     * @param debaseDaiPool_ Address of the Debase Dai pool contract
+     * @param debaseDaiLpPool_ Address of the Debase Dai LP pool contract
      * @param debasePolicy_ Address of the Debase policy contract
      */
     function initialize(
-        address debaseYCurvePool_,
-        uint256 debaseYCurveTotalRatio,
-        address debaseDAIPool_,
-        uint256 debaseDAITotalRatio,
+        address debaseDaiPool_,
+        uint256 debaseDaiTotalRatio,
+        address debaseDaiLpPool_,
+        uint256 debaseDaiLpTotalRatio,
         address debasePolicy_
     ) external initializer {
-        require(debaseDAITotalRatio.add(debaseYCurveTotalRatio) == 100);
 
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
 
         debasePolicy = debasePolicy_;
 
-        uint256 debaseYCurvePoolVal = _totalSupply
-            .mul(debaseYCurveTotalRatio)
+        uint256 debaseDaiPoolVal = _totalSupply
+            .mul(debaseDaiTotalRatio)
             .div(100);
-        uint256 debaseYCurvePoolGons = debaseYCurvePoolVal.mul(
+        uint256 debaseDaiPoolGons = debaseDaiPoolVal.mul(
             _gonsPerFragment
         );
 
-        uint256 debaseDAIPoolVal = _totalSupply.mul(debaseDAITotalRatio).div(
+        uint256 debaseDaiLpPoolVal = _totalSupply.mul(debaseDaiLpTotalRatio).div(
             100
         );
-        uint256 debaseDAIPoolGons = debaseDAIPoolVal.mul(_gonsPerFragment);
+        uint256 debaseDaiLpPoolGons = debaseDaiLpPoolVal.mul(_gonsPerFragment);
 
-        _gonBalances[debaseYCurvePool_] = debaseYCurvePoolGons;
-        _gonBalances[debaseDAIPool_] = debaseDAIPoolGons;
+        _gonBalances[debaseDaiPool_] = debaseDaiPoolGons;
+        _gonBalances[debaseDaiLpPool_] = debaseDaiLpPoolGons;
 
-        emit Transfer(address(0x0), debaseYCurvePool_, debaseYCurvePoolVal);
-        emit Transfer(address(0x0), debaseDAIPool_, debaseDAIPoolVal);
+        emit Transfer(address(0x0), debaseDaiPool_, debaseDaiPoolVal);
+        emit Transfer(address(0x0), debaseDaiLpPool_, debaseDaiLpPoolVal);
     }
 
     /**

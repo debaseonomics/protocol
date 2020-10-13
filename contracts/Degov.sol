@@ -1,4 +1,5 @@
-pragma solidity 0.6.6;
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.6.6;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -10,8 +11,6 @@ contract Degov is ERC20, Ownable, Initializable {
     using SafeMath for uint256;
 
     uint256 private constant DECIMALS = 18;
-
-    address public degovUNIPool;
 
     /// @notice A record of each accounts delegate
     mapping(address => address) public delegates;
@@ -70,11 +69,12 @@ contract Degov is ERC20, Ownable, Initializable {
 
     /**
      * @notice Initialize the token with policy address and pool for the token distribution
-     * @param degovUNIPool_ Address of the pool contract where newly minted degov tokens are sent.
+     * @param degovUniPool_ Address of the pool contract where newly minted degov tokens are sent.
      */
-    function initialize(address degovUNIPool_) external initializer {
-        degovUNIPool = degovUNIPool_;
-        _mint(degovUNIPool, TOTAL_SUPPLY);
+    function initialize(address degovUniPool_,uint256 degovUniTotalRatio,address degovUniLpPool_,uint256 degovUniLpTotalRatio) external initializer {
+        _mint(degovUniPool_, TOTAL_SUPPLY.mul(degovUniTotalRatio).div(100));
+        _mint(degovUniLpPool_, TOTAL_SUPPLY.mul(degovUniLpTotalRatio).div(100));
+
     }
 
     /**

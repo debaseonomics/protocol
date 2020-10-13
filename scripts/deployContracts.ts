@@ -1,7 +1,4 @@
 import { run, ethers } from '@nomiclabs/buidler';
-import { FACTORY_ADDRESS, INIT_CODE_HASH } from '@uniswap/sdk';
-import { pack, keccak256 } from '@ethersproject/solidity';
-import { getCreate2Address } from '@ethersproject/address';
 
 import DegovArtifact from '../artifacts/Degov.json';
 import GovernorAlphaArtifact from '../artifacts/GovernorAlpha.json';
@@ -75,11 +72,10 @@ async function main() {
 		governorAlpha: '',
 		timelock: '',
 		debaseDAIPool: '',
-		debaseYCurvePool: '',
+		debaseDAILPPool: '',
 		degovUNIPool: '',
 		orchestrator: '',
 		DAI: '0x6b175474e89094c44da98b954eedeac495271d0f',
-		YCurve: '0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8',
 		UNI: '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
 		debaseDAILP: ''
 	};
@@ -94,17 +90,8 @@ async function main() {
 		const orchestrator = await orchestratorFactory.deploy();
 
 		const debaseDAIPool = await stakingPoolFactory.deploy();
-		const debaseYCurvePool = await stakingPoolFactory.deploy();
+		const debaseDAILPPool = await stakingPoolFactory.deploy();
 		const degovUNIPool = await stakingPoolFactory.deploy();
-
-		balance = (await signer[0].getBalance()).toString();
-		console.log('Balance after deploy', ethers.utils.formatEther(balance));
-
-		const debaseDAILP = getCreate2Address(
-			FACTORY_ADDRESS,
-			keccak256([ 'bytes' ], [ pack([ 'address', 'address' ], [ debase.address, contractAddresses.DAI ]) ]),
-			INIT_CODE_HASH
-		);
 
 		contractAddresses.degov = degov.address;
 		contractAddresses.debase = debase.address;
@@ -115,10 +102,8 @@ async function main() {
 		contractAddresses.orchestrator = orchestrator.address;
 
 		contractAddresses.debaseDAIPool = debaseDAIPool.address;
-		contractAddresses.debaseYCurvePool = debaseYCurvePool.address;
+		contractAddresses.debaseDAILPPool = debaseDAILPPool.address;
 		contractAddresses.degovUNIPool = degovUNIPool.address;
-
-		contractAddresses.debaseDAILP = debaseDAILP;
 
 		const data = JSON.stringify(contractAddresses);
 		await promises.writeFile('contracts.json', data);

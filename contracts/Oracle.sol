@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.6.6;
+pragma solidity >=0.6.6;
 
 // Some code reproduced from
 // https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2Pair.sol
