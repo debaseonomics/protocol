@@ -118,6 +118,7 @@ contract StakingPool is
     uint256 public fairDistributionTokenLimit;
     uint256 public fairDistributionTimeLimit;
     bool public isFairDistribution;
+    address constant uniFactory = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
@@ -164,11 +165,25 @@ contract StakingPool is
         _;
     }
 
+    // https://uniswap.org/docs/v2/smart-contract-integration/getting-pair-addresses/
+    function genUniAddr(address left, address right) internal pure returns (address) {
+        address first = left < right ? left : right;
+        address second = left < right ? right : left;
+        address pair = address(uint(keccak256(abi.encodePacked(
+          hex'ff',
+          uniFactory,
+          keccak256(abi.encodePacked(first, second)),
+          hex'96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f'
+        ))));
+        return pair;
+    }
+
 
     function initialize(
         string memory poolName_,
         address rewardToken_,
-        address stakeToken,
+        address pairToken_,
+        bool isUniPair,
         address orchestrator_,
         uint256 ratio,
         uint256 duration_,
@@ -179,7 +194,12 @@ contract StakingPool is
         uint256 oracleStartTimeOffset
     ) public initializer {
         poolName = poolName_;
-        setStakeToken(stakeToken);
+        if(isUniPair){
+            setStakeToken(genUniAddr(rewardToken_,pairToken_));
+        }
+        else{
+            setStakeToken(pairToken_);
+        }
         rewardToken = IERC20(rewardToken_);
         orchestrator = orchestrator_;
 
