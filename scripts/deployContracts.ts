@@ -71,13 +71,15 @@ async function main() {
 		debasePolicy: '',
 		governorAlpha: '',
 		timelock: '',
-		debaseDAIPool: '',
-		debaseDAILPPool: '',
-		degovUNIPool: '',
+		debaseDaiPool: '',
+		debaseDaiLpPool: '',
+		degovUsdcPool: '',
+		degovUsdcLpPool: '',
 		orchestrator: '',
-		DAI: '0x6b175474e89094c44da98b954eedeac495271d0f',
-		UNI: '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
-		debaseDAILP: ''
+		dai: '0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea',
+		usdc: '0xddea378a6ddc8afec82c36e9b0078826bf9e68b6',
+		debaseDaiLp: '',
+		degovUsdcLp: ''
 	};
 
 	try {
@@ -89,9 +91,10 @@ async function main() {
 		const timelock = await timeLockFactory.deploy();
 		const orchestrator = await orchestratorFactory.deploy();
 
-		const debaseDAIPool = await stakingPoolFactory.deploy();
-		const debaseDAILPPool = await stakingPoolFactory.deploy();
-		const degovUNIPool = await stakingPoolFactory.deploy();
+		const debaseDaiPool = await stakingPoolFactory.deploy();
+		const debaseDaiLpPool = await stakingPoolFactory.deploy();
+		const degovUsdcPool = await stakingPoolFactory.deploy();
+		const degovUsdcLpPool = await stakingPoolFactory.deploy();
 
 		contractAddresses.degov = degov.address;
 		contractAddresses.debase = debase.address;
@@ -101,9 +104,10 @@ async function main() {
 		contractAddresses.timelock = timelock.address;
 		contractAddresses.orchestrator = orchestrator.address;
 
-		contractAddresses.debaseDAIPool = debaseDAIPool.address;
-		contractAddresses.debaseDAILPPool = debaseDAILPPool.address;
-		contractAddresses.degovUNIPool = degovUNIPool.address;
+		contractAddresses.debaseDaiPool = debaseDaiPool.address;
+		contractAddresses.debaseDaiLpPool = debaseDaiLpPool.address;
+		contractAddresses.degovUsdcPool = degovUsdcPool.address;
+		contractAddresses.degovUsdcLpPool = degovUsdcLpPool.address;
 
 		const data = JSON.stringify(contractAddresses);
 		await promises.writeFile('contracts.json', data);

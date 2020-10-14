@@ -37,8 +37,8 @@ contract Orchestrator is Ownable, Initializable {
     DebasePolicyI public debasePolicy;
     StakingPoolI public debaseDaiPool;
     StakingPoolI public debaseDaiLpPool;
-    StakingPoolI public degovUniPool;
-    StakingPoolI public degovUniLpPool;
+    StakingPoolI public degovUsdcPool;
+    StakingPoolI public degovUsdcLpPool;
     bool public rebaseStarted;
     uint256 public maximumRebaseTime;
     uint256 public rebaseRequiredSupply;
@@ -91,8 +91,8 @@ contract Orchestrator is Ownable, Initializable {
         address debasePolicy_,
         address debaseDaiPool_,
         address debaseDaiLpPool_,
-        address degovUniPool_,
-        address degovUniLpPool_,
+        address degovUsdcPool_,
+        address degovUsdcLpPool_,
         uint256 requiredSupplyRatio,
         uint256 oracleStartTimeOffset
     ) external initializer {
@@ -101,8 +101,8 @@ contract Orchestrator is Ownable, Initializable {
 
         debaseDaiPool = StakingPoolI(debaseDaiPool_);
         debaseDaiLpPool = StakingPoolI(debaseDaiLpPool_);
-        degovUniPool = StakingPoolI(degovUniPool_);
-        degovUniLpPool = StakingPoolI(degovUniLpPool_);
+        degovUsdcPool = StakingPoolI(degovUsdcPool_);
+        degovUsdcLpPool = StakingPoolI(degovUsdcLpPool_);
 
         maximumRebaseTime = block.timestamp + oracleStartTimeOffset;
         rebaseStarted = false;
@@ -147,8 +147,8 @@ contract Orchestrator is Ownable, Initializable {
             "Not enough rewards distributed or time less than start time");
             
             //Start degov reward drop
-            degovUniPool.startPool();
-            degovUniLpPool.startPool();
+            degovUsdcPool.startPool();
+            degovUsdcLpPool.startPool();
             rebaseStarted = true;
             emit LogRebaseStarted(block.timestamp);
         }

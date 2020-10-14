@@ -99,9 +99,9 @@ contract Oracle is Ownable, ExampleOracleSimple, IOracle {
 
     constructor(
         address debase_,
-        address DAI_,
+        address Dai_,
         address debasePolicy_
-    ) public ExampleOracleSimple(uniFactory, debase_, DAI_) {
+    ) public ExampleOracleSimple(uniFactory, debase_, Dai_) {
         debase = debase_;
         debasePolicy = debasePolicy_;
     }
@@ -123,7 +123,7 @@ contract Oracle is Ownable, ExampleOracleSimple, IOracle {
             "Only debase policy can get data from oracle"
         );
         update();
-        uint256 price = consult(debase, SCALE); // will return 1 BASED in DAI
+        uint256 price = consult(debase, SCALE); // will return 1 BASED in Dai
 
         if (price == 0) {
             return (0, false);
