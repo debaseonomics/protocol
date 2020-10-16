@@ -27,8 +27,6 @@ import { promises } from 'fs';
 async function main() {
 	await run('typechain');
 	const signer = await ethers.getSigners();
-	const acc = await signer[0].getAddress();
-	console.log(acc);
 
 	const degovFactory = (new ethers.ContractFactory(
 		DegovArtifact.abi,

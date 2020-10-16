@@ -14,23 +14,24 @@ async function main() {
 		let data = await promises.readFile('contracts.json', 'utf-8');
 		let dataParse = JSON.parse(data.toString());
 
-		const oracleFactory = (new ethers.ContractFactory(
-			OracleArtifact.abi,
-			OracleArtifact.bytecode,
-			signer[0]
-		) as any) as OracleFactory;
+		// const oracleFactory = (new ethers.ContractFactory(
+		// 	OracleArtifact.abi,
+		// 	OracleArtifact.bytecode,
+		// 	signer[0]
+		// ) as any) as OracleFactory;
 		const debasePolicy = ((await ethers.getContractAt(
 			DebasePolicyArtifact.abi,
 			dataParse['debasePolicy'],
 			signer[0]
 		)) as any) as DebasePolicy;
 
-		const oracle = await oracleFactory.deploy(dataParse['debase'], dataParse['dai'], dataParse['debasePolicy']);
-		debasePolicy.setOracle(oracle.address);
+		// const oracle = await oracleFactory.deploy(dataParse['debase'], dataParse['dai'], dataParse['debasePolicy']);
+		// debasePolicy.setOracle(oracle.address);
+		await debasePolicy.setExchangeRate(2);
 
-		dataParse['oracle'] = oracle.address;
-		const updatedData = JSON.stringify(dataParse);
-		await promises.writeFile('contracts.json', updatedData);
+		// dataParse['oracle'] = oracle.address;
+		// const updatedData = JSON.stringify(dataParse);
+		// await promises.writeFile('contracts.json', updatedData);
 	} catch (error) {
 		console.log(error);
 	}

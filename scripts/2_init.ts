@@ -79,6 +79,7 @@ async function main() {
 			signer[0]
 		)) as any) as Orchestrator;
 
+		const min_30 = 30 * 60;
 		const one_hour = 60 * 60;
 		const two_hour = 2 * one_hour;
 		const four_hour = 4 * one_hour;
@@ -95,9 +96,9 @@ async function main() {
 			rewardToken: dataParse['debase'], // Reward Token
 			stakeToken: dataParse['dai'], // Stake Token
 			isUniLp: false,
-			ratio: 25,
+			ratio: 10,
 			orchestrator: orchestrator.address,
-			halvingDuration: two_hour,
+			halvingDuration: min_30,
 			fairDistribution: true,
 			fairDistributionTokenLimit: 10000,
 			fairDistributionTimeLimit: one_day,
@@ -110,7 +111,7 @@ async function main() {
 			rewardToken: dataParse['debase'], // Reward Token
 			stakeToken: dataParse['dai'], // Stake Token
 			isUniLp: true,
-			ratio: 75,
+			ratio: 30,
 			orchestrator: orchestrator.address,
 			halvingDuration: two_hour,
 			fairDistribution: false,

@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/upgrades/contracts/Initializable.sol";
 import "./lib/SafeMathInt.sol";
+import '@nomiclabs/buidler/console.sol';
 import "./lib/UInt256Lib.sol";
 
 interface IOracle {
@@ -13,8 +14,21 @@ interface IOracle {
 }
 
 interface DebaseI {
-    function totalSupply( ) external view returns(uint256);
-    function rebase(uint256 epoch, int256 supplyDelta) external returns (uint256);
+    function totalSupply() external view returns (uint256);
+
+    function balanceOf(address who) external returns (uint256);
+
+    function rebase(uint256 epoch, int256 supplyDelta)
+        external
+        returns (uint256);
+
+    function transfer(address to, uint256 value) external returns (bool);
+}
+
+interface StabilityPoolI {
+    function notifyRewardAmount(uint256 reward) external;
+
+    function periodFinish() external returns (uint256);
 }
 
 /**
@@ -44,7 +58,11 @@ contract DebasePolicy is Ownable, Initializable {
         uint256 upperDeviationThreshold_
     );
     event LogSetDefaultRebaseLag(uint256 defaultRebaseLag_);
+
     event LogSetUseDefaultRebaseLag(bool useDefaultRebaseLag_);
+
+    event LogUsingDefaultRebaseLag(int256 defaultRebaseLag_);
+
     event LogSetRebaseTimingParameters(
         uint256 minRebaseTimeIntervalSec_,
         uint256 rebaseWindowOffsetSec_,
@@ -52,16 +70,41 @@ contract DebasePolicy is Ownable, Initializable {
     );
     event LogSetOracle(IOracle oracle_);
 
-    event LogBreakpoint(
-        string indexed actionType,
+    event LogNewBreakpoint(
+        bool indexed selected,
         int256 indexed lowerDelta_,
         int256 indexed upperDelta_,
         int256 lag_
     );
-    event LogSelectedBreakpoint(
+
+    event LogUpdateBreakpoint(
+        bool indexed selected,
         int256 indexed lowerDelta_,
         int256 indexed upperDelta_,
-        int256 indexed lag_
+        int256 lag_
+    );
+
+    event LogDeleteBreakpoint(
+        bool indexed selected,
+        int256 lowerDelta_,
+        int256 upperDelta_,
+        int256 lag_
+    );
+
+    event LogSelectedBreakpoint(
+        int256 lowerDelta_,
+        int256 upperDelta_,
+        int256 lag_
+    );
+
+    event LogRebaseSequenceReward(uint256 reward);
+
+    event LogRebaseSequenceEnabled(bool rebaseSequenceEnabled);
+    event LogRebaseSequenceThreshold(uint256 rebaseSequenceThreshold);
+    event LogRebaseRewardTotalRatio(uint256 rebaseRewardTotalRatio);
+    event LogRebaseRewardHalfing(bool rebaseRewardHalfing);
+    event LogRebaseRewardBeforePeriodFinish(
+        bool rebaseRewardBeforePeriodFinish
     );
 
     // Struct of rebase lag break point. It defines the supply delta range within which the lag can be applied.
@@ -78,7 +121,7 @@ contract DebasePolicy is Ownable, Initializable {
     address public oracleDeployer;
 
     //Flag to check if the oracle has been deployed
-    bool public isOracleSet = false;
+    bool public isOracleSet;
 
     // Market oracle provides the token/USD exchange rate as an 18 decimal fixed point number.
     // (eg) An oracle value of 1.5e18 it would mean 1 Ample is trading for $1.50.
@@ -89,16 +132,16 @@ contract DebasePolicy is Ownable, Initializable {
     // (ie) (rate - targetRate) / targetRate < upperdeviationThreshold or lowerdeviationThreshold, then no supply change.
     // DECIMALS Fixed point number.
     // deviationThreshold = 0.05e18 = 5e16
-    uint256 public upperDeviationThreshold = 5 * 10**(DECIMALS - 2);
-    uint256 public lowerDeviationThreshold = 5 * 10**(DECIMALS - 2);
+    uint256 public upperDeviationThreshold;
+    uint256 public lowerDeviationThreshold;
 
     //Flag to use default rebase lag instead of the breakpoints.
-    bool public useDefaultRebaseLag = false;
+    bool public useDefaultRebaseLag;
 
     // The rebase lag parameter, used to dampen the applied supply adjustment by 1 / rebaseLag
     // Check setRebaseLag comments for more details.
     // Natural number, no decimal places.
-    uint256 public defaultRebaseLag = 30;
+    uint256 public defaultRebaseLag;
 
     //List of breakpoints for positive supply delta
     LagBreakpoint[] public upperLagBreakpoints;
@@ -106,20 +149,28 @@ contract DebasePolicy is Ownable, Initializable {
     LagBreakpoint[] public lowerLagBreakpoints;
 
     // More than this much time must pass between rebase operations.
-    uint256 public minRebaseTimeIntervalSec = 1 days;
+    uint256 public minRebaseTimeIntervalSec;
 
     // Block timestamp of last rebase operation
-    uint256 public lastRebaseTimestampSec = 0;
+    uint256 public lastRebaseTimestampSec;
 
     // The rebase window begins this many seconds into the minRebaseTimeInterval period.
     // For example if minRebaseTimeInterval is 24hrs, it represents the time of day in seconds.
-    uint256 public rebaseWindowOffsetSec = 72000;
+    uint256 public rebaseWindowOffsetSec;
 
     // The length of the time window where a rebase operation is allowed to execute, in seconds.
-    uint256 public rebaseWindowLengthSec = 15 minutes;
+    uint256 public rebaseWindowLengthSec;
+
+    uint256 public rebaseSequenceCount;
+    uint256 public rebaseSequenceThreshold;
+    uint256 public rebaseRewardTotalRatio;
+    bool public rebaseSequenceEnabled;
+    bool public rebaseRewardHalfing;
+    bool public rebaseRewardBeforePeriodFinish;
+    StabilityPoolI public debaseDaiLpPool;
 
     // The number of rebase cycles since inception
-    uint256 public epoch = 0;
+    uint256 public epoch;
 
     uint256 private constant DECIMALS = 18;
     // THe price target to meet
@@ -142,11 +193,83 @@ contract DebasePolicy is Ownable, Initializable {
     /**
      * @notice Initializes the debase policy with addresses of the debase token and the oracle deployer. Along with inital rebasing parameters
      * @param debase_ Address of the debase token
+     * @param orchestrator_ Address of the protocol orchestrator
      */
-    function initialize(address debase_,address orchestrator_) external initializer onlyOwner {
+    function initialize(
+        address debase_,
+        address orchestrator_,
+        address debaseDaiLpPool_
+    ) external initializer onlyOwner {
         debase = DebaseI(debase_);
         orchestrator = orchestrator_;
         oracleDeployer = msg.sender;
+        debaseDaiLpPool = StabilityPoolI(debaseDaiLpPool_);
+
+        isOracleSet = false;
+
+        upperDeviationThreshold = 5 * 10**(DECIMALS - 2);
+        lowerDeviationThreshold = 5 * 10**(DECIMALS - 2);
+
+        useDefaultRebaseLag = false;
+        defaultRebaseLag = 30;
+
+        minRebaseTimeIntervalSec = 5 minutes;
+        lastRebaseTimestampSec = 0;
+        rebaseWindowOffsetSec = 0;
+        rebaseWindowLengthSec = 3 minutes;
+
+        rebaseSequenceEnabled = true;
+        rebaseSequenceCount = 0;
+        rebaseSequenceThreshold = 20;
+        rebaseRewardTotalRatio = 1;
+        rebaseRewardHalfing = false;
+        rebaseRewardBeforePeriodFinish = false;
+
+        exchangeRate = 10**DECIMALS;
+
+        epoch = 0;
+    }
+
+    function setRebaseSequenceEnabled(bool rebaseSequenceEnabled_)
+        external
+        onlyOwner
+    {
+        rebaseSequenceEnabled = rebaseSequenceEnabled_;
+        rebaseSequenceCount = 0;
+        emit LogRebaseSequenceEnabled(rebaseSequenceEnabled);
+    }
+
+    function setRebaseSequenceThreshold(uint256 rebaseSequenceThreshold_)
+        external
+        onlyOwner
+    {
+        require(rebaseSequenceThreshold_ >= 1);
+        rebaseSequenceThreshold = rebaseSequenceThreshold_;
+        emit LogRebaseSequenceThreshold(rebaseSequenceThreshold);
+    }
+
+    function setRebaseRewardTotalRatio(uint256 rebaseRewardTotalRatio_)
+        external
+        onlyOwner
+    {
+        require(rebaseRewardTotalRatio_ > 0 && rebaseRewardTotalRatio_ <= 100);
+        rebaseRewardTotalRatio = rebaseRewardTotalRatio_;
+        emit LogRebaseRewardTotalRatio(rebaseRewardTotalRatio);
+    }
+
+    function setRebaseRewardHalfing(bool rebaseRewardHalfing_)
+        external
+        onlyOwner
+    {
+        rebaseRewardHalfing = rebaseRewardHalfing_;
+        emit LogRebaseRewardHalfing(rebaseRewardHalfing);
+    }
+
+    function setRebaseRewardBeforePeriodFinish(
+        bool rebaseRewardBeforePeriodFinish_
+    ) external onlyOwner {
+        rebaseRewardBeforePeriodFinish = rebaseRewardBeforePeriodFinish_;
+        emit LogRebaseRewardBeforePeriodFinish(rebaseRewardBeforePeriodFinish);
     }
 
     /**
@@ -165,6 +288,12 @@ contract DebasePolicy is Ownable, Initializable {
         emit LogSetOracle(oracle);
     }
 
+    uint256 public exchangeRate;
+
+    function setExchangeRate(uint256 rate) public {
+        exchangeRate = rate.mul(10**18);
+    }
+
     /**
      * @notice Initiates a new rebase operation, provided the minimum time period has elapsed.
      * @dev The supply adjustment equals (_totalSupply * DeviationFromTargetRate) / rebaseLag
@@ -172,33 +301,45 @@ contract DebasePolicy is Ownable, Initializable {
      *      and targetRate is CpiOracleRate / baseCpi
      */
     function rebase() external onlyOrchestrator {
-        require(inRebaseWindow(),"Not in rebase window");
+        // require(inRebaseWindow(), "Not in rebase window");
 
         // This comparison also ensures there is no reentrancy.
-        require(lastRebaseTimestampSec.add(minRebaseTimeIntervalSec) < now);
+        // require(lastRebaseTimestampSec.add(minRebaseTimeIntervalSec) < now);
 
         // Snap the rebase time to the start of this window.
-        lastRebaseTimestampSec = now.sub(now.mod(minRebaseTimeIntervalSec)).add(
-            rebaseWindowOffsetSec
-        );
+        // lastRebaseTimestampSec = now.sub(now.mod(minRebaseTimeIntervalSec)).add(
+        //     rebaseWindowOffsetSec
+        // );
 
         epoch = epoch.add(1);
 
-        uint256 exchangeRate;
-        bool rateValid;
-        (exchangeRate, rateValid) = oracle.getData();
-        require(rateValid);
+        // bool rateValid;
+        //(exchangeRate, rateValid) = oracle.getData();
+        //require(rateValid);
 
-        if (exchangeRate > MAX_RATE) {
-            exchangeRate = MAX_RATE;
-        }
+        // if (exchangeRate > MAX_RATE) {
+        //     exchangeRate = MAX_RATE;
+        // }
+
+        console.log("Exchange Rate",exchangeRate,"Price target",priceTargetRate);
 
         int256 supplyDelta = computeSupplyDelta(exchangeRate, priceTargetRate);
+
+        console.log("Delta");
+        console.logInt(supplyDelta);
+
         int256 rebaseLag;
 
         if (supplyDelta != 0) {
             //Get rebase lag if the supply delta isn't zero
             rebaseLag = getRebaseLag(supplyDelta);
+
+            console.log("Rebase Lag");
+            console.logInt(rebaseLag);
+
+            if (rebaseSequenceEnabled) {
+                checkRebaseSequenceThreshold();
+            }
             // Apply the Dampening factor.
             supplyDelta = supplyDelta.div(rebaseLag);
         }
@@ -211,8 +352,38 @@ contract DebasePolicy is Ownable, Initializable {
         }
 
         uint256 supplyAfterRebase = debase.rebase(epoch, supplyDelta);
+        console.log("Supply",supplyAfterRebase);
         assert(supplyAfterRebase <= MAX_SUPPLY);
         emit LogRebase(epoch, exchangeRate, supplyDelta, rebaseLag, now);
+    }
+
+
+    function checkRebaseSequenceThreshold() internal {
+        console.log("threshold");
+        if (rebaseSequenceCount >= rebaseSequenceThreshold) {
+            if (
+                rebaseRewardBeforePeriodFinish ||
+                now >= debaseDaiLpPool.periodFinish()
+            ) {
+                uint256 balanceToTransfer = debase
+                    .balanceOf(address(this))
+                    .mul(rebaseRewardTotalRatio)
+                    .div(100);
+                require(
+                    debase.transfer(address(debaseDaiLpPool), balanceToTransfer)
+                );
+                if (rebaseRewardHalfing) {
+                    balanceToTransfer = balanceToTransfer.mul(50).div(100);
+                }
+                debaseDaiLpPool.notifyRewardAmount(balanceToTransfer);
+                emit LogRebaseSequenceReward(balanceToTransfer);
+            }
+            rebaseSequenceCount = 0;
+        } else {
+            rebaseSequenceCount.add(1);
+        }
+        console.log("threshold end");
+
     }
 
     /**
@@ -224,16 +395,22 @@ contract DebasePolicy is Ownable, Initializable {
      */
     function getRebaseLag(int256 supplyDelta_) private returns (int256) {
         int256 lag;
+        int256 supplyDeltaAbs = supplyDelta_.div(10e18).abs();
+        console.log("Delta Abs");
+        console.logInt(supplyDeltaAbs);
+
         if (useDefaultRebaseLag == false) {
             if (supplyDelta_ < 0) {
-                lag = findBreakpoint(supplyDelta_, lowerLagBreakpoints);
+                lag = findBreakpoint(supplyDeltaAbs, lowerLagBreakpoints);
             } else {
-                lag = findBreakpoint(supplyDelta_, upperLagBreakpoints);
+                lag = findBreakpoint(supplyDeltaAbs, upperLagBreakpoints);
+            }
+            if (lag != 0) {
+                return lag;
             }
         }
-        if (lag != 0) {
-            return lag;
-        }
+        emit LogUsingDefaultRebaseLag(defaultRebaseLag.toInt256Safe());
+
         return defaultRebaseLag.toInt256Safe();
     }
 
@@ -243,14 +420,14 @@ contract DebasePolicy is Ownable, Initializable {
     {
         uint256 index;
         LagBreakpoint memory instance;
-        int256 supplyDeltaAbs = supplyDelta.abs();
 
         for (index = 0; index < array.length; index = index.add(1)) {
             instance = array[index];
-            if (
-                supplyDeltaAbs >= instance.lowerDelta.abs() &&
-                supplyDeltaAbs < instance.upperDelta.abs()
-            ) {
+            if (supplyDelta < instance.lowerDelta) {
+                //Gab in break points found
+                break;
+            }
+            if (supplyDelta < instance.upperDelta) {
                 emit LogSelectedBreakpoint(
                     instance.lowerDelta,
                     instance.upperDelta,
@@ -259,6 +436,7 @@ contract DebasePolicy is Ownable, Initializable {
                 return instance.lag;
             }
         }
+        return 0;
     }
 
     /**
@@ -269,7 +447,7 @@ contract DebasePolicy is Ownable, Initializable {
      * @param defaultRebaseLag_ The new rebase lag parameter.
      */
     function setDefaultRebaseLag(uint256 defaultRebaseLag_) external onlyOwner {
-        require(defaultRebaseLag_ >= 1, "Lag can be at most 1 or greater");
+        require(defaultRebaseLag_ > 0, "Lag must be greater than zero");
         defaultRebaseLag = defaultRebaseLag_;
         emit LogSetDefaultRebaseLag(defaultRebaseLag_);
     }
@@ -301,39 +479,37 @@ contract DebasePolicy is Ownable, Initializable {
         int256 upperDelta_,
         int256 lag_
     ) public onlyOwner {
-        require(lag_ >= 1, "Lag can be at most 1 or greater");
+        require(lag_ > 0, "Lag must be greater than 0");
+
+        require(lowerDelta_ >= 0 && lowerDelta_ < upperDelta_);
+
         LagBreakpoint memory newPoint = LagBreakpoint(
             lowerDelta_,
             upperDelta_,
             lag_
         );
+
         LagBreakpoint memory lastPoint;
         uint256 length;
 
         if (select) {
-            require(lowerDelta_ >= 0 && upperDelta_ > 0);
-            require(lowerDelta_ < upperDelta_);
-
             length = upperLagBreakpoints.length;
             if (length > 0) {
                 lastPoint = upperLagBreakpoints[length.sub(1)];
-                require(lastPoint.upperDelta.abs() <= lowerDelta_.abs());
+                require(lastPoint.upperDelta <= lowerDelta_);
             }
 
             upperLagBreakpoints.push(newPoint);
         } else {
-            require(lowerDelta_ <= 0 && upperDelta_ < 0);
-            require(lowerDelta_ > upperDelta_);
-
             length = lowerLagBreakpoints.length;
             if (length > 0) {
                 lastPoint = lowerLagBreakpoints[length.sub(1)];
-                require(lastPoint.upperDelta.abs() <= lowerDelta_.abs());
+                require(lastPoint.upperDelta <= lowerDelta_);
             }
 
             lowerLagBreakpoints.push(newPoint);
         }
-        emit LogBreakpoint("Add new", lowerDelta_, upperDelta_, lag_);
+        emit LogNewBreakpoint(select, lowerDelta_, upperDelta_, lag_);
     }
 
     /**
@@ -353,23 +529,21 @@ contract DebasePolicy is Ownable, Initializable {
     ) public onlyOwner {
         LagBreakpoint storage instance;
 
+        require(lowerDelta_ >= 0 && lowerDelta_ < upperDelta_);
+
         if (select) {
-            require(lowerDelta_ >= 0 && upperDelta_ > 0);
-            require(lowerDelta_ < upperDelta_);
             withinPointRange(
                 index,
-                lowerDelta_.abs(),
-                upperDelta_.abs(),
+                lowerDelta_,
+                upperDelta_,
                 upperLagBreakpoints
             );
             instance = upperLagBreakpoints[index];
         } else {
-            require(lowerDelta_ <= 0 && upperDelta_ < 0);
-            require(lowerDelta_ > upperDelta_);
             withinPointRange(
                 index,
-                lowerDelta_.abs(),
-                upperDelta_.abs(),
+                lowerDelta_,
+                upperDelta_,
                 lowerLagBreakpoints
             );
             instance = lowerLagBreakpoints[index];
@@ -377,13 +551,13 @@ contract DebasePolicy is Ownable, Initializable {
         instance.lowerDelta = lowerDelta_;
         instance.upperDelta = upperDelta_;
         instance.lag = lag_;
-        emit LogBreakpoint("Update", lowerDelta_, upperDelta_, lag_);
+        emit LogUpdateBreakpoint(select, lowerDelta_, upperDelta_, lag_);
     }
 
     function withinPointRange(
         uint256 index,
-        int256 lowerDeltaAbs,
-        int256 upperDeltaAbs,
+        int256 lowerDelta_,
+        int256 upperDelta_,
         LagBreakpoint[] memory array
     ) internal pure {
         uint256 length = array.length;
@@ -395,16 +569,16 @@ contract DebasePolicy is Ownable, Initializable {
 
         if (index == 0 && length == 2) {
             upperPoint = array[index.add(1)];
-            require(upperDeltaAbs <= upperPoint.lowerDelta.abs());
+            require(upperDelta_ <= upperPoint.lowerDelta);
         } else if (index == length.sub(1)) {
             lowerPoint = array[index.sub(1)];
-            require(lowerDeltaAbs >= lowerPoint.upperDelta.abs());
+            require(lowerDelta_ >= lowerPoint.upperDelta);
         } else {
             upperPoint = array[index.add(1)];
             lowerPoint = array[index.sub(1)];
             require(
-                lowerDeltaAbs >= lowerPoint.upperDelta.abs() &&
-                    upperDeltaAbs <= upperPoint.lowerDelta.abs()
+                lowerDelta_ >= lowerPoint.upperDelta &&
+                    upperDelta_ <= upperPoint.lowerDelta
             );
         }
     }
@@ -430,8 +604,8 @@ contract DebasePolicy is Ownable, Initializable {
             instance = lowerLagBreakpoints[lowerLagBreakpoints.length.sub(1)];
             lowerLagBreakpoints.pop();
         }
-        emit LogBreakpoint(
-            "Delete",
+        emit LogDeleteBreakpoint(
+            select,
             instance.lowerDelta,
             instance.upperDelta,
             instance.lag
