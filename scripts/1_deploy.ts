@@ -3,6 +3,7 @@ import { run, ethers } from '@nomiclabs/buidler';
 import DegovArtifact from '../artifacts/Degov.json';
 import GovernorAlphaArtifact from '../artifacts/GovernorAlpha.json';
 import TimelockArtifact from '../artifacts/Timelock.json';
+import TokenArtifact from '../artifacts/Token.json';
 
 import StakingPoolArtifact from '../artifacts/StakingPool.json';
 
@@ -10,6 +11,7 @@ import DebaseArtifact from '../artifacts/Debase.json';
 import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
 import OrchestratorArtifact from '../artifacts/Orchestrator.json';
 
+import { TokenFactory } from '../type/TokenFactory';
 import { DegovFactory } from '../type/DegovFactory';
 import { GovernorAlphaFactory } from '../type/GovernorAlphaFactory';
 import { TimelockFactory } from '../type/TimelockFactory';
@@ -25,6 +27,8 @@ import { promises } from 'fs';
 async function main() {
 	await run('typechain');
 	const signer = await ethers.getSigners();
+	const acc = await signer[0].getAddress();
+	console.log(acc);
 
 	const degovFactory = (new ethers.ContractFactory(
 		DegovArtifact.abi,
@@ -62,6 +66,12 @@ async function main() {
 		signer[0]
 	) as any) as OrchestratorFactory;
 
+	const tokenFactory = (new ethers.ContractFactory(
+		TokenArtifact.abi,
+		TokenArtifact.bytecode,
+		signer[0]
+	) as any) as TokenFactory;
+
 	let balance = (await signer[0].getBalance()).toString();
 	console.log('Balance before deploy', ethers.utils.formatEther(balance));
 
@@ -76,13 +86,17 @@ async function main() {
 		degovUsdcPool: '',
 		degovUsdcLpPool: '',
 		orchestrator: '',
-		dai: '0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea',
-		usdc: '0xddea378a6ddc8afec82c36e9b0078826bf9e68b6',
+		dai: '',
+		usdc: '',
 		debaseDaiLp: '',
-		degovUsdcLp: ''
+		degovUsdcLp: '',
+		oracle: ''
 	};
 
 	try {
+		const dai = await tokenFactory.deploy('DAI', 'DAI', 18);
+		const usdc = await tokenFactory.deploy('USDC', 'USDC', 18);
+
 		const degov = await degovFactory.deploy();
 		const debase = await debaseFactory.deploy();
 
@@ -95,6 +109,9 @@ async function main() {
 		const debaseDaiLpPool = await stakingPoolFactory.deploy();
 		const degovUsdcPool = await stakingPoolFactory.deploy();
 		const degovUsdcLpPool = await stakingPoolFactory.deploy();
+
+		contractAddresses.dai = dai.address;
+		contractAddresses.usdc = usdc.address;
 
 		contractAddresses.degov = degov.address;
 		contractAddresses.debase = debase.address;

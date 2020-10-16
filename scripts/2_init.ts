@@ -20,6 +20,7 @@ import { WETH } from '@uniswap/sdk';
 
 async function main() {
 	const signer = await ethers.getSigners();
+	const acc = await signer[0].getAddress();
 
 	try {
 		let data = await promises.readFile('contracts.json', 'utf-8');
@@ -79,13 +80,15 @@ async function main() {
 		)) as any) as Orchestrator;
 
 		const one_hour = 60 * 60;
+		const two_hour = 2 * one_hour;
+		const four_hour = 4 * one_hour;
 		const one_day = 24 * one_hour;
 		const two_days = 2 * one_day;
 		const three_days = 3 * one_day;
 		const four_days = 4 * one_day;
 		const three_weeks = 21 * one_day;
 
-		const rebaseRequiredSupplyRatio = 95;
+		const rebaseRequiredSupplyRatio = 1;
 
 		const debaseDaiPoolParams = {
 			name: 'Debase/DAI Pool', //name
@@ -94,7 +97,7 @@ async function main() {
 			isUniLp: false,
 			ratio: 25,
 			orchestrator: orchestrator.address,
-			halvingDuration: one_day,
+			halvingDuration: two_hour,
 			fairDistribution: true,
 			fairDistributionTokenLimit: 10000,
 			fairDistributionTimeLimit: one_day,
@@ -109,7 +112,7 @@ async function main() {
 			isUniLp: true,
 			ratio: 75,
 			orchestrator: orchestrator.address,
-			halvingDuration: three_days,
+			halvingDuration: two_hour,
 			fairDistribution: false,
 			fairDistributionTokenLimit: 0,
 			fairDistributionTimeLimit: 0,
@@ -124,7 +127,7 @@ async function main() {
 			isUniLp: false,
 			ratio: 25,
 			orchestrator: orchestrator.address,
-			halvingDuration: two_days,
+			halvingDuration: two_hour,
 			fairDistribution: true,
 			fairDistributionTokenLimit: 5000,
 			fairDistributionTimeLimit: two_days,
@@ -139,7 +142,7 @@ async function main() {
 			isUniLp: true,
 			ratio: 75,
 			orchestrator: orchestrator.address,
-			halvingDuration: four_days,
+			halvingDuration: two_hour,
 			fairDistribution: false,
 			fairDistributionTokenLimit: 0,
 			fairDistributionTimeLimit: 0,
@@ -152,14 +155,26 @@ async function main() {
 
 		transaction = await debase.initialize(
 			dataParse['debaseDaiPool'],
-			25,
+			10,
 			dataParse['debaseDaiLpPool'],
-			75,
-			dataParse['debasePolicy']
+			30,
+			dataParse['debasePolicy'],
+			60
 		);
 		await transaction.wait(1);
 
-		await debasePolicy.initialize(dataParse['debase'], orchestrator.address);
+		await debasePolicy.initialize(dataParse['debase'], orchestrator.address, dataParse['debaseDaiLpPool']);
+
+		transaction = await debaseDaiLpPool.setRewardDistribution(acc);
+		await transaction.wait(1);
+		transaction = await debaseDaiPool.setRewardDistribution(acc);
+		await transaction.wait(1);
+
+		transaction = await degovUsdcPool.setRewardDistribution(orchestrator.address);
+		await transaction.wait(1);
+
+		transaction = await degovUsdcLpPool.setRewardDistribution(orchestrator.address);
+		await transaction.wait(1);
 
 		await debaseDaiPool.initialize(
 			debaseDaiPoolParams.name, //name
@@ -175,7 +190,7 @@ async function main() {
 			debaseDaiPoolParams.manualPoolStart, // Manual start pool
 			debaseDaiPoolParams.startTimeOffset // Start Time offset
 		);
-		await debaseDaiLpPool.initialize(
+		transaction = await debaseDaiLpPool.initialize(
 			debaseDaiLpPoolParams.name, //name
 			debaseDaiLpPoolParams.rewardToken, // Reward Token
 			debaseDaiLpPoolParams.stakeToken, // Stake Token
@@ -189,6 +204,12 @@ async function main() {
 			debaseDaiLpPoolParams.manualPoolStart, // Manual start pool
 			debaseDaiLpPoolParams.startTimeOffset // Start Time offset
 		);
+
+		await transaction.wait(1);
+
+		transaction = await debaseDaiLpPool.setRewardDistribution(debasePolicy.address);
+		await transaction.wait(1);
+
 		await degovUsdcPool.initialize(
 			degovUsdcPoolParams.name, //name
 			degovUsdcPoolParams.rewardToken, // Reward Token
@@ -204,7 +225,7 @@ async function main() {
 			degovUsdcPoolParams.startTimeOffset // Start Time offset
 		);
 
-		await degovUsdcLpPool.initialize(
+		transaction = await degovUsdcLpPool.initialize(
 			degovUsdcLpPoolParams.name, //name
 			degovUsdcLpPoolParams.rewardToken, // Reward Token
 			degovUsdcLpPoolParams.stakeToken, // Stake Token
@@ -218,6 +239,7 @@ async function main() {
 			degovUsdcLpPoolParams.manualPoolStart, // Manual start pool
 			degovUsdcLpPoolParams.startTimeOffset // Start Time offset
 		);
+
 		await governorAlpha.initialize(timelock.address, dataParse['degov']);
 		await timelock.initialize(governorAlpha.address);
 		await orchestrator.initialize(
@@ -232,7 +254,7 @@ async function main() {
 		);
 
 		await orchestrator.addPair(dataParse['debase'], dataParse['dai']);
-		await orchestrator.addPair(dataParse['debase'], WETH[1].address);
+		await orchestrator.addPair(dataParse['debase'], WETH[4].address);
 	} catch (error) {
 		console.log(error);
 	}

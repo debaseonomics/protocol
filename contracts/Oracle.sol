@@ -12,10 +12,6 @@ import "@uniswap/lib/contracts/libraries/FixedPoint.sol";
 import "@uniswap/v2-periphery/contracts/libraries/UniswapV2OracleLibrary.sol";
 import "@uniswap/v2-periphery/contracts/libraries/UniswapV2Library.sol";
 
-interface IOracle {
-    function getData() external returns (uint256, bool);
-}
-
 // fixed window oracle that recomputes the average price for the entire period once every period
 // note that the price average is only guaranteed to be over at least 1 period, but may be over a longer period
 contract ExampleOracleSimple {
@@ -91,7 +87,7 @@ contract ExampleOracleSimple {
     }
 }
 
-contract Oracle is Ownable, ExampleOracleSimple, IOracle {
+contract Oracle is Ownable, ExampleOracleSimple {
     address debase;
     address public debasePolicy;
     uint256 constant SCALE = 10**18;
@@ -117,7 +113,7 @@ contract Oracle is Ownable, ExampleOracleSimple, IOracle {
      * @notice Get a price data sample from the oralce. Can only be called by the debase policy.
      * @return The price and if the price if valid
      */
-    function getData() external override returns (uint256, bool) {
+    function getData() external returns (uint256, bool) {
         require(
             msg.sender == debasePolicy,
             "Only debase policy can get data from oracle"

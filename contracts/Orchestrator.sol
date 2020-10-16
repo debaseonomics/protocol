@@ -5,15 +5,18 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/upgrades/contracts/Initializable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-
 interface StakingPoolI {
-    function totalRewards() external returns (uint256);
+    function rewardDistributed() external returns (uint256);
+
     function startPool() external;
 }
 
 interface DebaseI {
-    function totalSupply( ) external view returns(uint256);
-    function rebase(uint256 epoch, int256 supplyDelta) external returns (uint256);
+    function totalSupply() external view returns (uint256);
+
+    function rebase(uint256 epoch, int256 supplyDelta)
+        external
+        returns (uint256);
 }
 
 interface DebasePolicyI {
@@ -106,7 +109,8 @@ contract Orchestrator is Ownable, Initializable {
 
         maximumRebaseTime = block.timestamp + oracleStartTimeOffset;
         rebaseStarted = false;
-        rebaseRequiredSupply = (debase.totalSupply().mul(requiredSupplyRatio)).div(100);
+        rebaseRequiredSupply = (debase.totalSupply().mul(requiredSupplyRatio))
+            .div(100);
     }
 
     function addPair(address token1, address token2) external onlyOwner {
@@ -137,15 +141,16 @@ contract Orchestrator is Ownable, Initializable {
         // Rebase will only be called when 95% of the total supply has been distributed or current time is 3 weeks since the orchestrator was deployed.
         // To stop the rebase from getting stuck if no enough rewards are distributed. This will also start the degov/debase pool reward drops
         if (rebaseStarted == false) {
-            uint256 rewardsDistributed = debaseDaiPool.totalRewards().add(
-                debaseDaiLpPool.totalRewards()
+            uint256 rewardsDistributed = debaseDaiPool.rewardDistributed().add(
+                debaseDaiLpPool.rewardDistributed()
             );
 
             require(
                 rewardsDistributed >= rebaseRequiredSupply ||
                     block.timestamp >= maximumRebaseTime,
-            "Not enough rewards distributed or time less than start time");
-            
+                "Not enough rewards distributed or time less than start time"
+            );
+
             //Start degov reward drop
             degovUsdcPool.startPool();
             degovUsdcLpPool.startPool();

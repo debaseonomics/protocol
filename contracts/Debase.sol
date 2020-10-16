@@ -88,31 +88,44 @@ contract Debase is ERC20, Initializable {
         uint256 debaseDaiTotalRatio,
         address debaseDaiLpPool_,
         uint256 debaseDaiLpTotalRatio,
-        address debasePolicy_
+        address debasePolicy_,
+        uint256 debasePolicyTotalRatio
     ) external initializer {
+        require(
+            debaseDaiTotalRatio.add(debaseDaiLpTotalRatio).add(
+                debasePolicyTotalRatio
+            ) == 100
+        );
 
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
 
         debasePolicy = debasePolicy_;
 
-        uint256 debaseDaiPoolVal = _totalSupply
-            .mul(debaseDaiTotalRatio)
-            .div(100);
-        uint256 debaseDaiPoolGons = debaseDaiPoolVal.mul(
-            _gonsPerFragment
-        );
-
-        uint256 debaseDaiLpPoolVal = _totalSupply.mul(debaseDaiLpTotalRatio).div(
+        uint256 debaseDaiPoolVal = _totalSupply.mul(debaseDaiTotalRatio).div(
             100
         );
+        uint256 debaseDaiPoolGons = debaseDaiPoolVal.mul(_gonsPerFragment);
+
+        uint256 debaseDaiLpPoolVal = _totalSupply
+            .mul(debaseDaiLpTotalRatio)
+            .div(100);
+
         uint256 debaseDaiLpPoolGons = debaseDaiLpPoolVal.mul(_gonsPerFragment);
+
+        uint256 debasePolicyPoolVal = _totalSupply
+            .mul(debasePolicyTotalRatio)
+            .div(100);
+
+        uint256 debasePolicyGons = debasePolicyPoolVal.mul(_gonsPerFragment);
 
         _gonBalances[debaseDaiPool_] = debaseDaiPoolGons;
         _gonBalances[debaseDaiLpPool_] = debaseDaiLpPoolGons;
+        _gonBalances[debasePolicy] = debasePolicyGons;
 
         emit Transfer(address(0x0), debaseDaiPool_, debaseDaiPoolVal);
         emit Transfer(address(0x0), debaseDaiLpPool_, debaseDaiLpPoolVal);
+        emit Transfer(address(0x0), debasePolicy, debasePolicyPoolVal);
     }
 
     /**

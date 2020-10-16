@@ -8,10 +8,15 @@ import "@openzeppelin/upgrades/contracts/Initializable.sol";
 import "./Timelock.sol";
 
 interface DegovI {
-    function totalSupply( ) external view returns(uint256);
-    function quorumThreshold() external view returns(uint256);
-    function proposalThreshold( ) external view returns(uint256);
-    function getPriorVotes(address account, uint256 blockNumber) external returns(uint256);
+    function totalSupply() external view returns (uint256);
+
+    function quorumThreshold() external view returns (uint256);
+
+    function proposalThreshold() external view returns (uint256);
+
+    function getPriorVotes(address account, uint256 blockNumber)
+        external
+        returns (uint256);
 }
 
 contract GovernorAlpha is Initializable, Ownable {

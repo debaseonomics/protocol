@@ -41,11 +41,12 @@ import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/upgrades/contracts/Initializable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-abstract contract IRewardDistributionRecipient {
+abstract contract IRewardDistributionRecipient is Ownable {
     address public rewardDistribution;
 
-    function notifyRewardAmount(uint256 reward) internal virtual;
+    function notifyRewardAmount(uint256 reward) public virtual;
 
     modifier onlyRewardDistribution() {
         require(
@@ -55,7 +56,10 @@ abstract contract IRewardDistributionRecipient {
         _;
     }
 
-    function setRewardDistribution(address _rewardDistribution) external {
+    function setRewardDistribution(address _rewardDistribution)
+        public
+        onlyOwner
+    {
         rewardDistribution = _rewardDistribution;
     }
 }
@@ -106,15 +110,15 @@ contract StakingPool is
     bool public manualStartPool;
 
     uint256 public initReward;
-    uint256 public totalReward;
+    uint256 public maxlReward;
     bool public poolStarted;
     uint256 public startTime;
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
-    uint256 public totalRewards = 0;
-    
+    uint256 public rewardDistributed = 0;
+
     uint256 public fairDistributionTokenLimit;
     uint256 public fairDistributionTimeLimit;
     bool public isFairDistribution;
@@ -129,11 +133,6 @@ contract StakingPool is
     event RewardPaid(address indexed user, uint256 reward);
     event ManualPoolStarted(uint256 startedAt);
 
-    modifier onlyOrchestrator() {
-        require(msg.sender == address(orchestrator));
-        _;
-    }
-
     modifier checkHalve() {
         if (block.timestamp >= periodFinish) {
             initReward = initReward.mul(50).div(100);
@@ -146,11 +145,13 @@ contract StakingPool is
     }
 
     modifier checkStart() {
-        if(manualStartPool && !poolStarted){
+        if (manualStartPool) {
             require(poolStarted == true, "Orchestrator hasn't started pool");
-        }
-        else{
-            require(block.timestamp > startTime, "Can't use pool before start time");
+        } else {
+            require(
+                block.timestamp > startTime,
+                "Can't use pool before start time"
+            );
         }
         _;
     }
@@ -166,18 +167,27 @@ contract StakingPool is
     }
 
     // https://uniswap.org/docs/v2/smart-contract-integration/getting-pair-addresses/
-    function genUniAddr(address left, address right) internal pure returns (address) {
+    function genUniAddr(address left, address right)
+        internal
+        pure
+        returns (address)
+    {
         address first = left < right ? left : right;
         address second = left < right ? right : left;
-        address pair = address(uint(keccak256(abi.encodePacked(
-          hex'ff',
-          uniFactory,
-          keccak256(abi.encodePacked(first, second)),
-          hex'96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f'
-        ))));
+        address pair = address(
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        hex"ff",
+                        uniFactory,
+                        keccak256(abi.encodePacked(first, second)),
+                        hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f"
+                    )
+                )
+            )
+        );
         return pair;
     }
-
 
     function initialize(
         string memory poolName_,
@@ -194,35 +204,40 @@ contract StakingPool is
         uint256 oracleStartTimeOffset
     ) public initializer {
         poolName = poolName_;
-        if(isUniPair){
-            setStakeToken(genUniAddr(rewardToken_,pairToken_));
-        }
-        else{
+        if (isUniPair) {
+            setStakeToken(genUniAddr(rewardToken_, pairToken_));
+        } else {
             setStakeToken(pairToken_);
         }
         rewardToken = IERC20(rewardToken_);
         orchestrator = orchestrator_;
 
-        totalReward = rewardToken.totalSupply().mul(ratio).div(100);
+        maxlReward = rewardToken.totalSupply().mul(ratio).div(100);
         duration = duration_;
 
         isFairDistribution = isFairDistribution_;
         fairDistributionTokenLimit = fairDistributionTokenLimit_;
         fairDistributionTimeLimit = fairDistributionTimeLimit_;
         manualStartPool = manualStartPool_;
-        
-        if(!manualStartPool){
+
+        if (!manualStartPool) {
             startTime = block.timestamp + oracleStartTimeOffset;
-            notifyRewardAmount(totalReward.mul(50).div(100));
+            notifyRewardAmount(maxlReward.mul(50).div(100));
         }
     }
 
-    function startPool() external onlyOrchestrator {
-        require(poolStarted == false,"Pool can only be started once");
-        
+    function setDuration(uint256 duration_) external onlyOwner {
+        require(duration >= 1);
+        duration = duration_;
+    }
+
+    function startPool() external {
+        require(msg.sender == address(orchestrator));
+        require(poolStarted == false, "Pool can only be started once");
+
         poolStarted = true;
         startTime = block.timestamp + 1;
-        notifyRewardAmount(totalReward.mul(50).div(100));
+        notifyRewardAmount(maxlReward.mul(50).div(100));
         emit ManualPoolStarted(startTime);
     }
 
@@ -264,9 +279,10 @@ contract StakingPool is
         super.stake(amount);
         emit Staked(msg.sender, amount);
 
-        if(isFairDistribution){
+        if (isFairDistribution) {
             require(
-                balanceOf(msg.sender) <= fairDistributionTokenLimit * uint256(10)**y.decimals() ||
+                balanceOf(msg.sender) <=
+                    fairDistributionTokenLimit * uint256(10)**y.decimals() ||
                     block.timestamp >= startTime.add(fairDistributionTimeLimit),
                 "Can't stake more than distribution limit"
             );
@@ -296,13 +312,14 @@ contract StakingPool is
             rewards[msg.sender] = 0;
             rewardToken.safeTransfer(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
-            totalRewards = totalRewards.add(reward);
+            rewardDistributed = rewardDistributed.add(reward);
         }
     }
 
     function notifyRewardAmount(uint256 reward)
-        internal
+        public
         override
+        onlyRewardDistribution
         updateReward(address(0))
     {
         if (block.timestamp >= periodFinish) {
