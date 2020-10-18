@@ -5,12 +5,14 @@ import GovernorAlphaArtifact from '../artifacts/GovernorAlpha.json';
 import TimelockArtifact from '../artifacts/Timelock.json';
 import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
 import OrchestratorArtifact from '../artifacts/Orchestrator.json';
+import StabilizerPoolArtifact from '../artifacts/StabilizerPool.json';
 
 import { Degov } from '../type/Degov';
 import { GovernorAlpha } from '../type/GovernorAlpha';
 import { Timelock } from '../type/Timelock';
 import { DebasePolicy } from '../type/DebasePolicy';
 import { Orchestrator } from '../type/Orchestrator';
+import { StabilizerPool } from '../type/StabilizerPool';
 import { promises } from 'fs';
 
 async function main() {
@@ -43,6 +45,12 @@ async function main() {
 			signer[0]
 		)) as any) as Orchestrator;
 
+		const debaseDaiLpStabilizerPool = ((await ethers.getContractAt(
+			StabilizerPoolArtifact.abi,
+			dataParse['debaseDaiLpStabilizerPool'],
+			signer[0]
+		)) as any) as StabilizerPool;
+
 		let balance = (await signer[0].getBalance()).toString();
 		console.log('Balance before transfer ownership', ethers.utils.formatEther(balance));
 
@@ -51,6 +59,7 @@ async function main() {
 		await governorAlpha.transferOwnership(timelock.address);
 		await debasePolicy.transferOwnership(timelock.address);
 		await orchestrator.transferOwnership(timelock.address);
+		await debaseDaiLpStabilizerPool.transferOwnership(timelock.address);
 
 		balance = (await signer[0].getBalance()).toString();
 		console.log('Balance after transfer ownership', ethers.utils.formatEther(balance));

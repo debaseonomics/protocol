@@ -110,13 +110,11 @@ contract Debase is ERC20, Initializable {
         uint256 debaseDaiLpPoolVal = _totalSupply
             .mul(debaseDaiLpTotalRatio)
             .div(100);
-
         uint256 debaseDaiLpPoolGons = debaseDaiLpPoolVal.mul(_gonsPerFragment);
 
         uint256 debasePolicyPoolVal = _totalSupply
             .mul(debasePolicyTotalRatio)
             .div(100);
-
         uint256 debasePolicyGons = debasePolicyPoolVal.mul(_gonsPerFragment);
 
         _gonBalances[debaseDaiPool_] = debaseDaiPoolGons;

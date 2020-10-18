@@ -3,20 +3,20 @@ import { run, ethers } from '@nomiclabs/buidler';
 import DegovArtifact from '../artifacts/Degov.json';
 import GovernorAlphaArtifact from '../artifacts/GovernorAlpha.json';
 import TimelockArtifact from '../artifacts/Timelock.json';
-import TokenArtifact from '../artifacts/Token.json';
 
 import StakingPoolArtifact from '../artifacts/StakingPool.json';
+import StabilizerPoolArtifact from '../artifacts/StabilizerPool.json';
 
 import DebaseArtifact from '../artifacts/Debase.json';
 import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
 import OrchestratorArtifact from '../artifacts/Orchestrator.json';
 
-import { TokenFactory } from '../type/TokenFactory';
 import { DegovFactory } from '../type/DegovFactory';
 import { GovernorAlphaFactory } from '../type/GovernorAlphaFactory';
 import { TimelockFactory } from '../type/TimelockFactory';
 
 import { StakingPoolFactory } from '../type/StakingPoolFactory';
+import { StabilizerPoolFactory } from '../type/StabilizerPoolFactory';
 
 import { DebaseFactory } from '../type/DebaseFactory';
 import { DebasePolicyFactory } from '../type/DebasePolicyFactory';
@@ -48,6 +48,11 @@ async function main() {
 		StakingPoolArtifact.bytecode,
 		signer[0]
 	) as any) as StakingPoolFactory;
+	const stabilizerPoolFactory = (new ethers.ContractFactory(
+		StabilizerPoolArtifact.abi,
+		StabilizerPoolArtifact.bytecode,
+		signer[0]
+	) as any) as StabilizerPoolFactory;
 	const debaseFactory = (new ethers.ContractFactory(
 		DebaseArtifact.abi,
 		DebaseArtifact.bytecode,
@@ -64,12 +69,6 @@ async function main() {
 		signer[0]
 	) as any) as OrchestratorFactory;
 
-	const tokenFactory = (new ethers.ContractFactory(
-		TokenArtifact.abi,
-		TokenArtifact.bytecode,
-		signer[0]
-	) as any) as TokenFactory;
-
 	let balance = (await signer[0].getBalance()).toString();
 	console.log('Balance before deploy', ethers.utils.formatEther(balance));
 
@@ -84,17 +83,15 @@ async function main() {
 		degovUsdcPool: '',
 		degovUsdcLpPool: '',
 		orchestrator: '',
-		dai: '',
-		usdc: '',
+		dai: '0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea',
+		usdc: '0x4dbcdf9b62e891a7cec5a2568c3f4faf9e8abe2b',
 		debaseDaiLp: '',
 		degovUsdcLp: '',
-		oracle: ''
+		oracle: '',
+		debaseDaiLpStabilizerPool: ''
 	};
 
 	try {
-		const dai = await tokenFactory.deploy('DAI', 'DAI', 18);
-		const usdc = await tokenFactory.deploy('USDC', 'USDC', 18);
-
 		const degov = await degovFactory.deploy();
 		const debase = await debaseFactory.deploy();
 
@@ -107,9 +104,7 @@ async function main() {
 		const debaseDaiLpPool = await stakingPoolFactory.deploy();
 		const degovUsdcPool = await stakingPoolFactory.deploy();
 		const degovUsdcLpPool = await stakingPoolFactory.deploy();
-
-		contractAddresses.dai = dai.address;
-		contractAddresses.usdc = usdc.address;
+		const debaseDaiLpStabilizerPool = await stabilizerPoolFactory.deploy();
 
 		contractAddresses.degov = degov.address;
 		contractAddresses.debase = debase.address;
@@ -123,6 +118,8 @@ async function main() {
 		contractAddresses.debaseDaiLpPool = debaseDaiLpPool.address;
 		contractAddresses.degovUsdcPool = degovUsdcPool.address;
 		contractAddresses.degovUsdcLpPool = degovUsdcLpPool.address;
+
+		contractAddresses.debaseDaiLpStabilizerPool = debaseDaiLpStabilizerPool.address;
 
 		const data = JSON.stringify(contractAddresses);
 		await promises.writeFile('contracts.json', data);

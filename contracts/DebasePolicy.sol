@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/upgrades/contracts/Initializable.sol";
 import "./lib/SafeMathInt.sol";
-import '@nomiclabs/buidler/console.sol';
 import "./lib/UInt256Lib.sol";
 
 interface IOracle {
@@ -25,8 +24,10 @@ interface DebaseI {
     function transfer(address to, uint256 value) external returns (bool);
 }
 
-interface StabilityPoolI {
+interface PoolI {
     function notifyRewardAmount(uint256 reward) external;
+
+    function startPool() external;
 
     function periodFinish() external returns (uint256);
 }
@@ -57,7 +58,7 @@ contract DebasePolicy is Ownable, Initializable {
         uint256 lowerDeviationThreshold_,
         uint256 upperDeviationThreshold_
     );
-    event LogSetDefaultRebaseLag(uint256 defaultRebaseLag_);
+    event LogSetDefaultRebaseLag(uint256 defaultPositiveRebaseLag_,uint256 defaultNegativeRebaseLag_);
 
     event LogSetUseDefaultRebaseLag(bool useDefaultRebaseLag_);
 
@@ -102,7 +103,6 @@ contract DebasePolicy is Ownable, Initializable {
     event LogRebaseSequenceEnabled(bool rebaseSequenceEnabled);
     event LogRebaseSequenceThreshold(uint256 rebaseSequenceThreshold);
     event LogRebaseRewardTotalRatio(uint256 rebaseRewardTotalRatio);
-    event LogRebaseRewardHalfing(bool rebaseRewardHalfing);
     event LogRebaseRewardBeforePeriodFinish(
         bool rebaseRewardBeforePeriodFinish
     );
@@ -141,7 +141,10 @@ contract DebasePolicy is Ownable, Initializable {
     // The rebase lag parameter, used to dampen the applied supply adjustment by 1 / rebaseLag
     // Check setRebaseLag comments for more details.
     // Natural number, no decimal places.
-    uint256 public defaultRebaseLag;
+    uint256 public defaultPositiveRebaseLag;
+
+    uint256 public defaultNegativeRebaseLag;
+
 
     //List of breakpoints for positive supply delta
     LagBreakpoint[] public upperLagBreakpoints;
@@ -161,20 +164,34 @@ contract DebasePolicy is Ownable, Initializable {
     // The length of the time window where a rebase operation is allowed to execute, in seconds.
     uint256 public rebaseWindowLengthSec;
 
+    // The count of rebases hitting their target
     uint256 public rebaseSequenceCount;
+
+    // The threshold count on which to send rewards to the stabilizer pool
     uint256 public rebaseSequenceThreshold;
-    uint256 public rebaseRewardTotalRatio;
+
+    // Flag to enable rebase sequences
     bool public rebaseSequenceEnabled;
-    bool public rebaseRewardHalfing;
+
+    // Flag to send reward before stabilizer pool period time finished
     bool public rebaseRewardBeforePeriodFinish;
-    StabilityPoolI public debaseDaiLpPool;
+
+    // Stabilizer reward pool
+    PoolI public debaseDaiLpStabilizerPool;
+
+    // Precentage of the debase balance to send to the reward pool
+    uint256 public rebaseRewardTotalRatio;
+
+    // Starting balance that has been transfered to the policiy contract
+    uint256 public startingBalance;
+
+    // THe price target to meet
+    uint256 public priceTargetRate = 10**DECIMALS;
 
     // The number of rebase cycles since inception
     uint256 public epoch;
 
     uint256 private constant DECIMALS = 18;
-    // THe price target to meet
-    uint256 public constant priceTargetRate = 10**DECIMALS;
 
     // Due to the expression in computeSupplyDelta(), MAX_RATE * MAX_SUPPLY must fit into an int256.
     // Both are 18 decimals fixed point numbers.
@@ -198,12 +215,12 @@ contract DebasePolicy is Ownable, Initializable {
     function initialize(
         address debase_,
         address orchestrator_,
-        address debaseDaiLpPool_
+        address debaseDaiLpStabilizerPool_
     ) external initializer onlyOwner {
         debase = DebaseI(debase_);
         orchestrator = orchestrator_;
         oracleDeployer = msg.sender;
-        debaseDaiLpPool = StabilityPoolI(debaseDaiLpPool_);
+        debaseDaiLpStabilizerPool = PoolI(debaseDaiLpStabilizerPool_);
 
         isOracleSet = false;
 
@@ -211,7 +228,8 @@ contract DebasePolicy is Ownable, Initializable {
         lowerDeviationThreshold = 5 * 10**(DECIMALS - 2);
 
         useDefaultRebaseLag = false;
-        defaultRebaseLag = 30;
+        defaultPositiveRebaseLag = 30;
+        defaultNegativeRebaseLag = 30;
 
         minRebaseTimeIntervalSec = 5 minutes;
         lastRebaseTimestampSec = 0;
@@ -222,10 +240,10 @@ contract DebasePolicy is Ownable, Initializable {
         rebaseSequenceCount = 0;
         rebaseSequenceThreshold = 20;
         rebaseRewardTotalRatio = 1;
-        rebaseRewardHalfing = false;
         rebaseRewardBeforePeriodFinish = false;
 
-        exchangeRate = 10**DECIMALS;
+        startingBalance = debase.balanceOf(address(this));
+        priceTargetRate = 10**DECIMALS;
 
         epoch = 0;
     }
@@ -257,14 +275,6 @@ contract DebasePolicy is Ownable, Initializable {
         emit LogRebaseRewardTotalRatio(rebaseRewardTotalRatio);
     }
 
-    function setRebaseRewardHalfing(bool rebaseRewardHalfing_)
-        external
-        onlyOwner
-    {
-        rebaseRewardHalfing = rebaseRewardHalfing_;
-        emit LogRebaseRewardHalfing(rebaseRewardHalfing);
-    }
-
     function setRebaseRewardBeforePeriodFinish(
         bool rebaseRewardBeforePeriodFinish_
     ) external onlyOwner {
@@ -288,12 +298,6 @@ contract DebasePolicy is Ownable, Initializable {
         emit LogSetOracle(oracle);
     }
 
-    uint256 public exchangeRate;
-
-    function setExchangeRate(uint256 rate) public {
-        exchangeRate = rate.mul(10**18);
-    }
-
     /**
      * @notice Initiates a new rebase operation, provided the minimum time period has elapsed.
      * @dev The supply adjustment equals (_totalSupply * DeviationFromTargetRate) / rebaseLag
@@ -301,32 +305,28 @@ contract DebasePolicy is Ownable, Initializable {
      *      and targetRate is CpiOracleRate / baseCpi
      */
     function rebase() external onlyOrchestrator {
-        // require(inRebaseWindow(), "Not in rebase window");
+        require(inRebaseWindow(), "Not in rebase window");
 
-        // This comparison also ensures there is no reentrancy.
-        // require(lastRebaseTimestampSec.add(minRebaseTimeIntervalSec) < now);
+        //This comparison also ensures there is no reentrancy.
+        require(lastRebaseTimestampSec.add(minRebaseTimeIntervalSec) < now);
 
-        // Snap the rebase time to the start of this window.
-        // lastRebaseTimestampSec = now.sub(now.mod(minRebaseTimeIntervalSec)).add(
-        //     rebaseWindowOffsetSec
-        // );
+        //Snap the rebase time to the start of this window.
+        lastRebaseTimestampSec = now.sub(now.mod(minRebaseTimeIntervalSec)).add(
+            rebaseWindowOffsetSec
+        );
 
         epoch = epoch.add(1);
 
-        // bool rateValid;
-        //(exchangeRate, rateValid) = oracle.getData();
-        //require(rateValid);
+        uint256 exchangeRate;
+        bool rateValid;
+        (exchangeRate, rateValid) = oracle.getData();
+        require(rateValid);
 
-        // if (exchangeRate > MAX_RATE) {
-        //     exchangeRate = MAX_RATE;
-        // }
-
-        console.log("Exchange Rate",exchangeRate,"Price target",priceTargetRate);
+        if (exchangeRate > MAX_RATE) {
+            exchangeRate = MAX_RATE;
+        }
 
         int256 supplyDelta = computeSupplyDelta(exchangeRate, priceTargetRate);
-
-        console.log("Delta");
-        console.logInt(supplyDelta);
 
         int256 rebaseLag;
 
@@ -334,14 +334,14 @@ contract DebasePolicy is Ownable, Initializable {
             //Get rebase lag if the supply delta isn't zero
             rebaseLag = getRebaseLag(supplyDelta);
 
-            console.log("Rebase Lag");
-            console.logInt(rebaseLag);
+            // Apply the Dampening factor.
+            supplyDelta = supplyDelta.div(rebaseLag);
 
+            rebaseSequenceCount = 0;
+        } else {
             if (rebaseSequenceEnabled) {
                 checkRebaseSequenceThreshold();
             }
-            // Apply the Dampening factor.
-            supplyDelta = supplyDelta.div(rebaseLag);
         }
 
         if (
@@ -352,38 +352,49 @@ contract DebasePolicy is Ownable, Initializable {
         }
 
         uint256 supplyAfterRebase = debase.rebase(epoch, supplyDelta);
-        console.log("Supply",supplyAfterRebase);
         assert(supplyAfterRebase <= MAX_SUPPLY);
         emit LogRebase(epoch, exchangeRate, supplyDelta, rebaseLag, now);
     }
 
+    /**
+     * @notice Sets the price target for rebases to compare against
+     * @param priceTargetRate_ The new price target
+     */
+    function setPriceTargetRate(uint256 priceTargetRate_) external onlyOwner {
+        require(priceTargetRate_ > 0);
+        priceTargetRate = priceTargetRate_;
+    }
 
+    /**
+     * @notice Upon succesive succesful rebases ( exchange price in target price ) the sequence count will increase. As the count increases if it 
+     * meets the set threshold. Then a precentage of debase tokens assigned to the policy contract will be transfered to the stabilizer pool. 
+     * With the added condition that the stabilizer pool has completed it's distribution period or a new flag is set to ovverride the time period.
+     */
     function checkRebaseSequenceThreshold() internal {
-        console.log("threshold");
+        rebaseSequenceCount = rebaseSequenceCount.add(1);
+
         if (rebaseSequenceCount >= rebaseSequenceThreshold) {
             if (
                 rebaseRewardBeforePeriodFinish ||
-                now >= debaseDaiLpPool.periodFinish()
+                now >= debaseDaiLpStabilizerPool.periodFinish()
             ) {
-                uint256 balanceToTransfer = debase
-                    .balanceOf(address(this))
+  
+                uint256 balanceToTransfer = startingBalance
                     .mul(rebaseRewardTotalRatio)
                     .div(100);
+
                 require(
-                    debase.transfer(address(debaseDaiLpPool), balanceToTransfer)
+                    debase.transfer(
+                        address(debaseDaiLpStabilizerPool),
+                        balanceToTransfer
+                    )
                 );
-                if (rebaseRewardHalfing) {
-                    balanceToTransfer = balanceToTransfer.mul(50).div(100);
-                }
-                debaseDaiLpPool.notifyRewardAmount(balanceToTransfer);
+
+                debaseDaiLpStabilizerPool.notifyRewardAmount(balanceToTransfer);
                 emit LogRebaseSequenceReward(balanceToTransfer);
             }
             rebaseSequenceCount = 0;
-        } else {
-            rebaseSequenceCount.add(1);
         }
-        console.log("threshold end");
-
     }
 
     /**
@@ -395,9 +406,7 @@ contract DebasePolicy is Ownable, Initializable {
      */
     function getRebaseLag(int256 supplyDelta_) private returns (int256) {
         int256 lag;
-        int256 supplyDeltaAbs = supplyDelta_.div(10e18).abs();
-        console.log("Delta Abs");
-        console.logInt(supplyDeltaAbs);
+        int256 supplyDeltaAbs = supplyDelta_.abs();
 
         if (useDefaultRebaseLag == false) {
             if (supplyDelta_ < 0) {
@@ -409,9 +418,16 @@ contract DebasePolicy is Ownable, Initializable {
                 return lag;
             }
         }
-        emit LogUsingDefaultRebaseLag(defaultRebaseLag.toInt256Safe());
 
-        return defaultRebaseLag.toInt256Safe();
+        if(supplyDelta_ < 0){
+            emit LogUsingDefaultRebaseLag(defaultNegativeRebaseLag.toInt256Safe());
+            return defaultNegativeRebaseLag.toInt256Safe();
+
+        }else{
+            emit LogUsingDefaultRebaseLag(defaultPositiveRebaseLag.toInt256Safe());
+            return defaultPositiveRebaseLag.toInt256Safe();
+        }
+
     }
 
     function findBreakpoint(int256 supplyDelta, LagBreakpoint[] memory array)
@@ -423,6 +439,7 @@ contract DebasePolicy is Ownable, Initializable {
 
         for (index = 0; index < array.length; index = index.add(1)) {
             instance = array[index];
+
             if (supplyDelta < instance.lowerDelta) {
                 //Gab in break points found
                 break;
@@ -444,12 +461,15 @@ contract DebasePolicy is Ownable, Initializable {
                If the rebase lag R, equals 1, the smallest value for R, then the full supply correction is applied on each rebase cycle.
                If it is greater than 1, then a correction of 1/R of is applied on each rebase.
                This lag will be used if the default rebase flag is set or if the rebase breakpoint array's are empty.
-     * @param defaultRebaseLag_ The new rebase lag parameter.
+     * @param defaultPositiveRebaseLag_ The new positive rebase lag parameter.
+     * @param defaultNegativeRebaseLag_ The new negative rebase lag parameter.
      */
-    function setDefaultRebaseLag(uint256 defaultRebaseLag_) external onlyOwner {
-        require(defaultRebaseLag_ > 0, "Lag must be greater than zero");
-        defaultRebaseLag = defaultRebaseLag_;
-        emit LogSetDefaultRebaseLag(defaultRebaseLag_);
+    function setDefaultRebaseLags(uint256 defaultPositiveRebaseLag_,uint256 defaultNegativeRebaseLag_) external onlyOwner {
+        require(defaultPositiveRebaseLag_ > 0 && defaultNegativeRebaseLag_ > 0, "Lag must be greater than zero");
+
+        defaultPositiveRebaseLag = defaultPositiveRebaseLag_;
+        defaultNegativeRebaseLag = defaultNegativeRebaseLag_;
+        emit LogSetDefaultRebaseLag(defaultPositiveRebaseLag,defaultNegativeRebaseLag);
     }
 
     /**
