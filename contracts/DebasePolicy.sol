@@ -69,7 +69,7 @@ contract DebasePolicy is Ownable, Initializable {
         uint256 rebaseWindowOffsetSec_,
         uint256 rebaseWindowLengthSec_
     );
-    event LogSetOracle(IOracle oracle_);
+    event LogSetOracle(address oracle_);
 
     event LogNewBreakpoint(
         bool indexed selected,
@@ -98,14 +98,17 @@ contract DebasePolicy is Ownable, Initializable {
         int256 lag_
     );
 
-    event LogRebaseSequenceReward(uint256 reward);
+    event LogNeutralRebaseReward(uint256 reward_);
 
-    event LogRebaseSequenceEnabled(bool rebaseSequenceEnabled);
-    event LogRebaseSequenceThreshold(uint256 rebaseSequenceThreshold);
-    event LogRebaseRewardTotalRatio(uint256 rebaseRewardTotalRatio);
+    event LogNeutralRebaseEnabled(bool neutralRebaseEnabled_);
+    event LogNeutralRebaseThreshold(uint256 neutralRebaseThreshold_);
+    event LogRebaseRewardTotalRatio(uint256 rebaseRewardTotalRatio_);
     event LogRebaseRewardBeforePeriodFinish(
-        bool rebaseRewardBeforePeriodFinish
+        bool rebaseRewardBeforePeriodFinish_
     );
+    event LogNeutralRebaseInSequence(bool neutralRebaseInSequence_);
+    event LogDebaseDaiLpStabilizerPool(address debaseDaiLpStabilizerPool_);
+    event LogSetPriceTargetRate(uint256 setPriceTargetRate_);
 
     // Struct of rebase lag break point. It defines the supply delta range within which the lag can be applied.
     struct LagBreakpoint {
@@ -116,12 +119,6 @@ contract DebasePolicy is Ownable, Initializable {
 
     // Address of the debase token
     DebaseI public debase;
-
-    //Address of the account allowed to deploy the oracle
-    address public oracleDeployer;
-
-    //Flag to check if the oracle has been deployed
-    bool public isOracleSet;
 
     // Market oracle provides the token/USD exchange rate as an 18 decimal fixed point number.
     // (eg) An oracle value of 1.5e18 it would mean 1 Ample is trading for $1.50.
@@ -165,13 +162,16 @@ contract DebasePolicy is Ownable, Initializable {
     uint256 public rebaseWindowLengthSec;
 
     // The count of rebases hitting their target
-    uint256 public rebaseSequenceCount;
+    uint256 public neutralRebaseCount;
 
     // The threshold count on which to send rewards to the stabilizer pool
-    uint256 public rebaseSequenceThreshold;
+    uint256 public neutralRebaseThreshold;
 
-    // Flag to enable rebase sequences
-    bool public rebaseSequenceEnabled;
+    // Flag to enable or disable neutral rebase sequence checker
+    bool public neutralRebaseInSequence;
+
+    // Flag to enable rebase neutrals counting and reward pools
+    bool public neutralRebaseEnabled;
 
     // Flag to send reward before stabilizer pool period time finished
     bool public rebaseRewardBeforePeriodFinish;
@@ -219,10 +219,7 @@ contract DebasePolicy is Ownable, Initializable {
     ) external initializer onlyOwner {
         debase = DebaseI(debase_);
         orchestrator = orchestrator_;
-        oracleDeployer = msg.sender;
         debaseDaiLpStabilizerPool = PoolI(debaseDaiLpStabilizerPool_);
-
-        isOracleSet = false;
 
         upperDeviationThreshold = 5 * 10**(DECIMALS - 2);
         lowerDeviationThreshold = 5 * 10**(DECIMALS - 2);
@@ -236,9 +233,10 @@ contract DebasePolicy is Ownable, Initializable {
         rebaseWindowOffsetSec = 0;
         rebaseWindowLengthSec = 3 minutes;
 
-        rebaseSequenceEnabled = true;
-        rebaseSequenceCount = 0;
-        rebaseSequenceThreshold = 20;
+        neutralRebaseEnabled = false;
+        neutralRebaseCount = 0;
+        neutralRebaseThreshold = 20;
+        neutralRebaseInSequence = true;
         rebaseRewardTotalRatio = 1;
         rebaseRewardBeforePeriodFinish = false;
 
@@ -248,24 +246,65 @@ contract DebasePolicy is Ownable, Initializable {
         epoch = 0;
     }
 
-    function setRebaseSequenceEnabled(bool rebaseSequenceEnabled_)
+
+    /**
+     * @notice Sets the price target for rebases to compare against
+     * @param priceTargetRate_ The new price target
+     */
+    function setPriceTargetRate(uint256 priceTargetRate_) external onlyOwner {
+        require(priceTargetRate_ > 0);
+        priceTargetRate = priceTargetRate_;
+        emit LogSetPriceTargetRate(priceTargetRate_);
+    }
+
+    /**
+     * @notice Function to enable or disable neutral rebases should be in sequence
+     * @param neutralRebaseInSequence_ Flag to set rebase in sequence
+     */
+    function setNeutralRebaseInSequence(bool neutralRebaseInSequence_) external onlyOwner {
+        neutralRebaseInSequence = neutralRebaseInSequence_;
+        emit LogNeutralRebaseInSequence(neutralRebaseInSequence_);
+    }
+
+    /**
+     * @notice Function to set the stabilizer pool
+     * @param debaseDaiLpStabilizerPool_ Address of the new stabilizer
+     */
+    function setDebaseDaiLpStabilizerPool(address debaseDaiLpStabilizerPool_) external onlyOwner {
+        debaseDaiLpStabilizerPool = PoolI(debaseDaiLpStabilizerPool_);
+        emit LogDebaseDaiLpStabilizerPool(debaseDaiLpStabilizerPool_);
+    }
+
+    /**
+     * @notice Function to enable or disable rebase neutral counter
+     * @param neutralRebaseEnabled_ Flag to set or unset rebase neutral and reset it's count
+     */
+    function setNeutralRebaseEnabled(bool neutralRebaseEnabled_)
         external
         onlyOwner
     {
-        rebaseSequenceEnabled = rebaseSequenceEnabled_;
-        rebaseSequenceCount = 0;
-        emit LogRebaseSequenceEnabled(rebaseSequenceEnabled);
+        neutralRebaseEnabled = neutralRebaseEnabled_;
+        neutralRebaseCount = 0;
+        emit LogNeutralRebaseEnabled(neutralRebaseEnabled);
     }
 
-    function setRebaseSequenceThreshold(uint256 rebaseSequenceThreshold_)
+    /**
+     * @notice Function to set the rebase neutral threshold
+     * @param neutralRebaseThreshold_ The new threshold
+     */
+    function setNeutralRebaseThreshold(uint256 neutralRebaseThreshold_)
         external
         onlyOwner
     {
-        require(rebaseSequenceThreshold_ >= 1);
-        rebaseSequenceThreshold = rebaseSequenceThreshold_;
-        emit LogRebaseSequenceThreshold(rebaseSequenceThreshold);
+        require(neutralRebaseThreshold_ >= 1);
+        neutralRebaseThreshold = neutralRebaseThreshold_;
+        emit LogNeutralRebaseThreshold(neutralRebaseThreshold);
     }
 
+    /**
+     * @notice Function to set the amount of the reward pool to distribute upon sucessful rebase
+     * @param rebaseRewardTotalRatio_ The precentage parameter
+     */
     function setRebaseRewardTotalRatio(uint256 rebaseRewardTotalRatio_)
         external
         onlyOwner
@@ -275,6 +314,10 @@ contract DebasePolicy is Ownable, Initializable {
         emit LogRebaseRewardTotalRatio(rebaseRewardTotalRatio);
     }
 
+    /**
+     * @notice Function to allow reward distribution before previous rewards have been distributed
+     * @param rebaseRewardBeforePeriodFinish_ Flag to toggle distribution
+     */
     function setRebaseRewardBeforePeriodFinish(
         bool rebaseRewardBeforePeriodFinish_
     ) external onlyOwner {
@@ -283,19 +326,12 @@ contract DebasePolicy is Ownable, Initializable {
     }
 
     /**
-     * @notice Function to launch the debase oracle which can only happen after the debase Dai pool has been launched.
-     *         So oracle deployer can deploy this oracle but is only capable of doing it once.
+     * @notice Function to set the oracle to get the exchange price
      * @param oracle_ Address of the debase oracle
      */
-    function setOracle(IOracle oracle_) external {
-        require(
-            msg.sender == oracleDeployer,
-            "Only oracle deployer can call this function"
-        );
-        require(isOracleSet == false, "Oracle can only be set once");
-        oracle = oracle_;
-        isOracleSet = true;
-        emit LogSetOracle(oracle);
+    function setOracle(address oracle_) external onlyOwner {
+        oracle = IOracle(oracle_);
+        emit LogSetOracle(oracle_);
     }
 
     /**
@@ -337,10 +373,13 @@ contract DebasePolicy is Ownable, Initializable {
             // Apply the Dampening factor.
             supplyDelta = supplyDelta.div(rebaseLag);
 
-            rebaseSequenceCount = 0;
+            if(neutralRebaseInSequence){
+                neutralRebaseCount = 0;
+            }
+
         } else {
-            if (rebaseSequenceEnabled) {
-                checkRebaseSequenceThreshold();
+            if (neutralRebaseEnabled) {
+                checkNeutralRebaseThreshold();
             }
         }
 
@@ -357,23 +396,14 @@ contract DebasePolicy is Ownable, Initializable {
     }
 
     /**
-     * @notice Sets the price target for rebases to compare against
-     * @param priceTargetRate_ The new price target
-     */
-    function setPriceTargetRate(uint256 priceTargetRate_) external onlyOwner {
-        require(priceTargetRate_ > 0);
-        priceTargetRate = priceTargetRate_;
-    }
-
-    /**
-     * @notice Upon succesive succesful rebases ( exchange price in target price ) the sequence count will increase. As the count increases if it 
+     * @notice Upon succesive succesful rebases ( exchange price in target price ) the neutral count will increase. As the count increases if it 
      * meets the set threshold. Then a precentage of debase tokens assigned to the policy contract will be transfered to the stabilizer pool. 
      * With the added condition that the stabilizer pool has completed it's distribution period or a new flag is set to ovverride the time period.
      */
-    function checkRebaseSequenceThreshold() internal {
-        rebaseSequenceCount = rebaseSequenceCount.add(1);
+    function checkNeutralRebaseThreshold() internal {
+        neutralRebaseCount = neutralRebaseCount.add(1);
 
-        if (rebaseSequenceCount >= rebaseSequenceThreshold) {
+        if (neutralRebaseCount >= neutralRebaseThreshold) {
             if (
                 rebaseRewardBeforePeriodFinish ||
                 now >= debaseDaiLpStabilizerPool.periodFinish()
@@ -391,9 +421,9 @@ contract DebasePolicy is Ownable, Initializable {
                 );
 
                 debaseDaiLpStabilizerPool.notifyRewardAmount(balanceToTransfer);
-                emit LogRebaseSequenceReward(balanceToTransfer);
+                emit LogNeutralRebaseReward(balanceToTransfer);
             }
-            rebaseSequenceCount = 0;
+            neutralRebaseCount = 0;
         }
     }
 

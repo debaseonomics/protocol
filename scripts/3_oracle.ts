@@ -6,7 +6,6 @@ import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
 import { OracleFactory } from '../type/OracleFactory';
 import { DebasePolicy } from '../type/DebasePolicy';
 import { promises } from 'fs';
-import { parseEther } from 'ethers/lib/utils';
 
 async function main() {
 	const signer = await ethers.getSigners();

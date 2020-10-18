@@ -18,12 +18,10 @@ import { StabilizerPool } from '../type/StabilizerPool';
 import { DebasePolicy } from '../type/DebasePolicy';
 import { Orchestrator } from '../type/Orchestrator';
 import { promises } from 'fs';
-import { WETH } from '@uniswap/sdk';
 import { parseEther } from 'ethers/lib/utils';
 
 async function main() {
 	const signer = await ethers.getSigners();
-	const acc = await signer[0].getAddress();
 
 	try {
 		let data = await promises.readFile('contracts.json', 'utf-8');
