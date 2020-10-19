@@ -46,7 +46,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 abstract contract IRewardDistributionRecipient is Ownable {
     address public rewardDistribution;
 
-    function notifyRewardAmount(uint256 reward) public virtual;
+    function notifyRewardAmount(uint256 reward) internal virtual;
 
     modifier onlyRewardDistribution() {
         require(
@@ -56,10 +56,7 @@ abstract contract IRewardDistributionRecipient is Ownable {
         _;
     }
 
-    function setRewardDistribution(address _rewardDistribution)
-        public
-        onlyOwner
-    {
+    function setRewardDistribution(address _rewardDistribution) public {
         rewardDistribution = _rewardDistribution;
     }
 }
@@ -103,27 +100,10 @@ contract StabilizerPool is
     LPTokenWrapper,
     IRewardDistributionRecipient
 {
-    string public poolName;
-    IERC20 public rewardToken;
-    address public orchestrator;
-    uint256 public duration;
-    bool public poolStarted;
-
-    uint256 public initReward;
-    uint256 public currentReward;
-    uint256 public periodFinish;
-    uint256 public rewardRate;
-    uint256 public lastUpdateTime;
-    uint256 public rewardPerTokenStored;
-    uint256 public rewardDistributed;
-
-    uint256 public fairDistributionTokenLimit;
-    uint256 public fairDistributionTimeLimit;
-    bool public isFairDistribution;
-    address constant uniFactory = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
-
-    mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewards;
+    event LogCountThreshold(uint256 countThreshold_);
+    event LogBeforePeriodFinish(bool beforePeriodFinish_);
+    event LogCountInSequence(bool CountInSequence_);
+    event LogSetRewardAmount(uint256 rewardAmount_);
 
     event RewardAdded(uint256 reward);
     event Staked(address indexed user, uint256 amount);
@@ -131,8 +111,38 @@ contract StabilizerPool is
     event RewardPaid(address indexed user, uint256 reward);
     event ManualPoolStarted(uint256 startedAt);
 
+    string public poolName;
+    IERC20 public rewardToken;
+    address public orchestrator;
+    uint256 public duration;
+    bool public poolEnabled;
+
+    uint256 public rewardAmount;
+    uint256 public periodFinish;
+    uint256 public rewardRate;
+    uint256 public lastUpdateTime;
+    uint256 public rewardPerTokenStored;
+    uint256 public rewardDistributed;
+
+    // The count of s hitting their target
+    uint256 public count;
+
+    // The threshold count on which to send rewards to the stabilizer pool
+    uint256 public countThreshold;
+
+    // Flag to enable or disable   sequence checker
+    bool public countInSequence;
+
+    // Flag to send reward before stabilizer pool period time finished
+    bool public beforePeriodFinish;
+
+    address constant uniFactory = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
+
+    mapping(address => uint256) public userRewardPerTokenPaid;
+    mapping(address => uint256) public rewards;
+
     modifier checkStart() {
-        require(poolStarted == true, "Orchestrator hasn't started pool");
+        require(poolEnabled == true, "Orchestrator hasn't started pool");
         _;
     }
 
@@ -174,6 +184,7 @@ contract StabilizerPool is
         address rewardToken_,
         address pairToken_,
         address orchestrator_,
+        uint256 rewardAmount_,
         uint256 duration_
     ) public initializer {
         poolName = poolName_;
@@ -181,7 +192,75 @@ contract StabilizerPool is
         rewardToken = IERC20(rewardToken_);
         orchestrator = orchestrator_;
         duration = duration_;
-        poolStarted = false;
+        poolEnabled = false;
+
+        rewardAmount = rewardAmount_;
+        count = 0;
+        countThreshold = 20;
+        countInSequence = true;
+        beforePeriodFinish = false;
+    }
+
+    /**
+     * @notice Upon succesive succesful s ( exchange price in target price ) the  count will increase. As the count increases if it
+     * meets the set threshold. Then a precentage of debase tokens assigned to the policy contract will be transfered to the stabilizer pool.
+     * With the added condition that the stabilizer pool has completed it's distribution period or a new flag is set to ovverride the time period.
+     */
+    function checkStabilizerCondition(
+        int256 supplyDelta_,
+        uint256 exchangeRate_,
+        uint256 rewardAmount_
+    ) external returns (bool) {
+        if (supplyDelta_ == 0) {
+            count = count.add(1);
+
+            if (count >= countThreshold) {
+                if (beforePeriodFinish || now >= periodFinish) {
+                    notifyRewardAmount(rewardAmount_);
+                    return true;
+                }
+                count = 0;
+            }
+        } else if (countInSequence) {
+            count = 0;
+        }
+        return false;
+    }
+
+    function setRewardAmount(uint256 rewardAmount_) external onlyOwner {
+        rewardAmount = rewardAmount_;
+        emit LogSetRewardAmount(rewardAmount);
+    }
+
+    /**
+     * @notice Function to enable or disable  s should be in sequence
+     * @param countInSequence_ Flag to set  in sequence
+     */
+    function setCountInSequence(bool countInSequence_) external onlyOwner {
+        countInSequence = countInSequence_;
+        emit LogCountInSequence(countInSequence);
+    }
+
+    /**
+     * @notice Function to set the   threshold
+     * @param countThreshold_ The new threshold
+     */
+    function setCountThreshold(uint256 countThreshold_) external onlyOwner {
+        require(countThreshold_ >= 1);
+        countThreshold = countThreshold_;
+        emit LogCountThreshold(countThreshold);
+    }
+
+    /**
+     * @notice Function to allow reward distribution before previous rewards have been distributed
+     * @param beforePeriodFinish_ Flag to toggle distribution
+     */
+    function setBeforePeriodFinish(bool beforePeriodFinish_)
+        external
+        onlyOwner
+    {
+        beforePeriodFinish = beforePeriodFinish_;
+        emit LogBeforePeriodFinish(beforePeriodFinish);
     }
 
     function setDuration(uint256 duration_) external onlyOwner {
@@ -189,10 +268,8 @@ contract StabilizerPool is
         duration = duration_;
     }
 
-    function startPool() external {
-        require(msg.sender == address(orchestrator));
-        require(poolStarted == false, "Pool can only be started once");
-        poolStarted = true;
+    function setPoolEnabled() external onlyOwner {
+        poolEnabled = !poolEnabled;
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {
@@ -260,9 +337,8 @@ contract StabilizerPool is
     }
 
     function notifyRewardAmount(uint256 reward)
-        public
+        internal
         override
-        onlyRewardDistribution
         updateReward(address(0))
     {
         if (block.timestamp >= periodFinish) {
@@ -272,7 +348,6 @@ contract StabilizerPool is
             uint256 leftover = remaining.mul(rewardRate);
             rewardRate = reward.add(leftover).div(duration);
         }
-        initReward = reward;
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp.add(duration);
         emit RewardAdded(reward);

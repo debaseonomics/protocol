@@ -24,12 +24,15 @@ interface DebaseI {
     function transfer(address to, uint256 value) external returns (bool);
 }
 
-interface PoolI {
-    function notifyRewardAmount(uint256 reward) external;
+interface StabilizerI {
+    function owner() external returns (address);
 
-    function startPool() external;
+    function checkStabilizerCondition(
+        int256 supplyDelta_,
+        uint256 exchangeRate_
+    ) external returns (bool);
 
-    function periodFinish() external returns (uint256);
+    function rewardAmount() external returns (uint256);
 }
 
 /**
@@ -58,7 +61,11 @@ contract DebasePolicy is Ownable, Initializable {
         uint256 lowerDeviationThreshold_,
         uint256 upperDeviationThreshold_
     );
-    event LogSetDefaultRebaseLag(uint256 defaultPositiveRebaseLag_,uint256 defaultNegativeRebaseLag_);
+
+    event LogSetDefaultRebaseLag(
+        uint256 defaultPositiveRebaseLag_,
+        uint256 defaultNegativeRebaseLag_
+    );
 
     event LogSetUseDefaultRebaseLag(bool useDefaultRebaseLag_);
 
@@ -69,6 +76,7 @@ contract DebasePolicy is Ownable, Initializable {
         uint256 rebaseWindowOffsetSec_,
         uint256 rebaseWindowLengthSec_
     );
+
     event LogSetOracle(address oracle_);
 
     event LogNewBreakpoint(
@@ -98,23 +106,30 @@ contract DebasePolicy is Ownable, Initializable {
         int256 lag_
     );
 
-    event LogNeutralRebaseReward(uint256 reward_);
-
-    event LogNeutralRebaseEnabled(bool neutralRebaseEnabled_);
-    event LogNeutralRebaseThreshold(uint256 neutralRebaseThreshold_);
-    event LogRebaseRewardTotalRatio(uint256 rebaseRewardTotalRatio_);
-    event LogRebaseRewardBeforePeriodFinish(
-        bool rebaseRewardBeforePeriodFinish_
-    );
-    event LogNeutralRebaseInSequence(bool neutralRebaseInSequence_);
-    event LogDebaseDaiLpStabilizerPool(address debaseDaiLpStabilizerPool_);
     event LogSetPriceTargetRate(uint256 setPriceTargetRate_);
+
+    event LogDeleteStabilizerPool(StabilizerI pool_);
+
+    event LogAddNewStabilizerPool(StabilizerI pool_);
+
+    event LogToggleStabilizerPool(uint256 index_, bool enabled_);
+
+    event LogRewardSentToStabilizer(
+        uint256 index,
+        StabilizerI poolI,
+        uint256 transferAmount
+    );
 
     // Struct of rebase lag break point. It defines the supply delta range within which the lag can be applied.
     struct LagBreakpoint {
         int256 lowerDelta;
         int256 upperDelta;
         int256 lag;
+    }
+
+    struct StabilizerPool {
+        bool enabled;
+        StabilizerI pool;
     }
 
     // Address of the debase token
@@ -142,7 +157,6 @@ contract DebasePolicy is Ownable, Initializable {
 
     uint256 public defaultNegativeRebaseLag;
 
-
     //List of breakpoints for positive supply delta
     LagBreakpoint[] public upperLagBreakpoints;
     //List of breakpoints for negative supply delta
@@ -161,29 +175,7 @@ contract DebasePolicy is Ownable, Initializable {
     // The length of the time window where a rebase operation is allowed to execute, in seconds.
     uint256 public rebaseWindowLengthSec;
 
-    // The count of rebases hitting their target
-    uint256 public neutralRebaseCount;
-
-    // The threshold count on which to send rewards to the stabilizer pool
-    uint256 public neutralRebaseThreshold;
-
-    // Flag to enable or disable neutral rebase sequence checker
-    bool public neutralRebaseInSequence;
-
-    // Flag to enable rebase neutrals counting and reward pools
-    bool public neutralRebaseEnabled;
-
-    // Flag to send reward before stabilizer pool period time finished
-    bool public rebaseRewardBeforePeriodFinish;
-
-    // Stabilizer reward pool
-    PoolI public debaseDaiLpStabilizerPool;
-
-    // Precentage of the debase balance to send to the reward pool
-    uint256 public rebaseRewardTotalRatio;
-
-    // Starting balance that has been transfered to the policiy contract
-    uint256 public startingBalance;
+    StabilizerPool[] public stabilizerPools;
 
     // THe price target to meet
     uint256 public priceTargetRate = 10**DECIMALS;
@@ -207,19 +199,26 @@ contract DebasePolicy is Ownable, Initializable {
         _;
     }
 
+    modifier indexInBounds(uint256 index) {
+        require(
+            index < stabilizerPools.length,
+            "Index must be less than array length"
+        );
+        _;
+    }
+
     /**
      * @notice Initializes the debase policy with addresses of the debase token and the oracle deployer. Along with inital rebasing parameters
      * @param debase_ Address of the debase token
      * @param orchestrator_ Address of the protocol orchestrator
      */
-    function initialize(
-        address debase_,
-        address orchestrator_,
-        address debaseDaiLpStabilizerPool_
-    ) external initializer onlyOwner {
+    function initialize(address debase_, address orchestrator_)
+        external
+        initializer
+        onlyOwner
+    {
         debase = DebaseI(debase_);
         orchestrator = orchestrator_;
-        debaseDaiLpStabilizerPool = PoolI(debaseDaiLpStabilizerPool_);
 
         upperDeviationThreshold = 5 * 10**(DECIMALS - 2);
         lowerDeviationThreshold = 5 * 10**(DECIMALS - 2);
@@ -233,19 +232,53 @@ contract DebasePolicy is Ownable, Initializable {
         rebaseWindowOffsetSec = 0;
         rebaseWindowLengthSec = 3 minutes;
 
-        neutralRebaseEnabled = false;
-        neutralRebaseCount = 0;
-        neutralRebaseThreshold = 20;
-        neutralRebaseInSequence = true;
-        rebaseRewardTotalRatio = 1;
-        rebaseRewardBeforePeriodFinish = false;
-
-        startingBalance = debase.balanceOf(address(this));
         priceTargetRate = 10**DECIMALS;
 
         epoch = 0;
     }
 
+    function addNewStabilizerPool(address pool_) external onlyOwner {
+        StabilizerPool memory instance = StabilizerPool(
+            false,
+            StabilizerI(pool_)
+        );
+
+        require(
+            instance.pool.owner() == owner(),
+            "Must have the same owner as policy contract"
+        );
+
+        stabilizerPools.push(instance);
+        emit LogAddNewStabilizerPool(instance.pool);
+    }
+
+    function removeStabilizerPool(uint256 index)
+        external
+        indexInBounds(index)
+        onlyOwner
+    {
+        StabilizerPool memory instanceToDelete = stabilizerPools[index];
+        require(
+            instanceToDelete.enabled == false,
+            "Only a disabled pool can be deleted"
+        );
+        uint256 length = stabilizerPools.length.sub(1);
+        if (index < length) {
+            stabilizerPools[index] = stabilizerPools[length];
+        }
+        emit LogDeleteStabilizerPool(instanceToDelete.pool);
+        stabilizerPools.pop();
+    }
+
+    function toggleStabilizerPool(uint256 index)
+        external
+        indexInBounds(index)
+        onlyOwner
+    {
+        StabilizerPool storage instance = stabilizerPools[index];
+        instance.enabled = !instance.enabled;
+        emit LogToggleStabilizerPool(index, instance.enabled);
+    }
 
     /**
      * @notice Sets the price target for rebases to compare against
@@ -255,74 +288,6 @@ contract DebasePolicy is Ownable, Initializable {
         require(priceTargetRate_ > 0);
         priceTargetRate = priceTargetRate_;
         emit LogSetPriceTargetRate(priceTargetRate_);
-    }
-
-    /**
-     * @notice Function to enable or disable neutral rebases should be in sequence
-     * @param neutralRebaseInSequence_ Flag to set rebase in sequence
-     */
-    function setNeutralRebaseInSequence(bool neutralRebaseInSequence_) external onlyOwner {
-        neutralRebaseInSequence = neutralRebaseInSequence_;
-        emit LogNeutralRebaseInSequence(neutralRebaseInSequence_);
-    }
-
-    /**
-     * @notice Function to set the stabilizer pool
-     * @param debaseDaiLpStabilizerPool_ Address of the new stabilizer
-     */
-    function setDebaseDaiLpStabilizerPool(address debaseDaiLpStabilizerPool_) external onlyOwner {
-        debaseDaiLpStabilizerPool = PoolI(debaseDaiLpStabilizerPool_);
-        emit LogDebaseDaiLpStabilizerPool(debaseDaiLpStabilizerPool_);
-    }
-
-    /**
-     * @notice Function to enable or disable rebase neutral counter
-     * @param neutralRebaseEnabled_ Flag to set or unset rebase neutral and reset it's count
-     */
-    function setNeutralRebaseEnabled(bool neutralRebaseEnabled_)
-        external
-        onlyOwner
-    {
-        neutralRebaseEnabled = neutralRebaseEnabled_;
-        neutralRebaseCount = 0;
-        emit LogNeutralRebaseEnabled(neutralRebaseEnabled);
-    }
-
-    /**
-     * @notice Function to set the rebase neutral threshold
-     * @param neutralRebaseThreshold_ The new threshold
-     */
-    function setNeutralRebaseThreshold(uint256 neutralRebaseThreshold_)
-        external
-        onlyOwner
-    {
-        require(neutralRebaseThreshold_ >= 1);
-        neutralRebaseThreshold = neutralRebaseThreshold_;
-        emit LogNeutralRebaseThreshold(neutralRebaseThreshold);
-    }
-
-    /**
-     * @notice Function to set the amount of the reward pool to distribute upon sucessful rebase
-     * @param rebaseRewardTotalRatio_ The precentage parameter
-     */
-    function setRebaseRewardTotalRatio(uint256 rebaseRewardTotalRatio_)
-        external
-        onlyOwner
-    {
-        require(rebaseRewardTotalRatio_ > 0 && rebaseRewardTotalRatio_ <= 100);
-        rebaseRewardTotalRatio = rebaseRewardTotalRatio_;
-        emit LogRebaseRewardTotalRatio(rebaseRewardTotalRatio);
-    }
-
-    /**
-     * @notice Function to allow reward distribution before previous rewards have been distributed
-     * @param rebaseRewardBeforePeriodFinish_ Flag to toggle distribution
-     */
-    function setRebaseRewardBeforePeriodFinish(
-        bool rebaseRewardBeforePeriodFinish_
-    ) external onlyOwner {
-        rebaseRewardBeforePeriodFinish = rebaseRewardBeforePeriodFinish_;
-        emit LogRebaseRewardBeforePeriodFinish(rebaseRewardBeforePeriodFinish);
     }
 
     /**
@@ -364,6 +329,8 @@ contract DebasePolicy is Ownable, Initializable {
 
         int256 supplyDelta = computeSupplyDelta(exchangeRate, priceTargetRate);
 
+        checkStabilizers(supplyDelta, exchangeRate);
+
         int256 rebaseLag;
 
         if (supplyDelta != 0) {
@@ -372,15 +339,6 @@ contract DebasePolicy is Ownable, Initializable {
 
             // Apply the Dampening factor.
             supplyDelta = supplyDelta.div(rebaseLag);
-
-            if(neutralRebaseInSequence){
-                neutralRebaseCount = 0;
-            }
-
-        } else {
-            if (neutralRebaseEnabled) {
-                checkNeutralRebaseThreshold();
-            }
         }
 
         if (
@@ -395,35 +353,37 @@ contract DebasePolicy is Ownable, Initializable {
         emit LogRebase(epoch, exchangeRate, supplyDelta, rebaseLag, now);
     }
 
-    /**
-     * @notice Upon succesive succesful rebases ( exchange price in target price ) the neutral count will increase. As the count increases if it 
-     * meets the set threshold. Then a precentage of debase tokens assigned to the policy contract will be transfered to the stabilizer pool. 
-     * With the added condition that the stabilizer pool has completed it's distribution period or a new flag is set to ovverride the time period.
-     */
-    function checkNeutralRebaseThreshold() internal {
-        neutralRebaseCount = neutralRebaseCount.add(1);
-
-        if (neutralRebaseCount >= neutralRebaseThreshold) {
+    function checkStabilizers(int256 supplyDelta_, uint256 exchangeRate_)
+        internal
+    {
+        for (
+            uint256 index = 0;
+            index < stabilizerPools.length;
+            index = index.add(1)
+        ) {
+            StabilizerPool memory instance = stabilizerPools[index];
             if (
-                rebaseRewardBeforePeriodFinish ||
-                now >= debaseDaiLpStabilizerPool.periodFinish()
+                instance.enabled &&
+                instance.pool.checkStabilizerCondition(
+                    supplyDelta_,
+                    exchangeRate_
+                )
             ) {
-  
-                uint256 balanceToTransfer = startingBalance
-                    .mul(rebaseRewardTotalRatio)
-                    .div(100);
-
-                require(
+                if (
+                    instance.pool.rewardAmount() <=
+                    debase.balanceOf(address(this))
+                ) {
                     debase.transfer(
-                        address(debaseDaiLpStabilizerPool),
-                        balanceToTransfer
-                    )
-                );
-
-                debaseDaiLpStabilizerPool.notifyRewardAmount(balanceToTransfer);
-                emit LogNeutralRebaseReward(balanceToTransfer);
+                        address(instance.pool),
+                        instance.pool.rewardAmount()
+                    );
+                    emit LogRewardSentToStabilizer(
+                        index,
+                        instance.pool,
+                        instance.pool.rewardAmount()
+                    );
+                }
             }
-            neutralRebaseCount = 0;
         }
     }
 
@@ -449,25 +409,26 @@ contract DebasePolicy is Ownable, Initializable {
             }
         }
 
-        if(supplyDelta_ < 0){
-            emit LogUsingDefaultRebaseLag(defaultNegativeRebaseLag.toInt256Safe());
+        if (supplyDelta_ < 0) {
+            emit LogUsingDefaultRebaseLag(
+                defaultNegativeRebaseLag.toInt256Safe()
+            );
             return defaultNegativeRebaseLag.toInt256Safe();
-
-        }else{
-            emit LogUsingDefaultRebaseLag(defaultPositiveRebaseLag.toInt256Safe());
+        } else {
+            emit LogUsingDefaultRebaseLag(
+                defaultPositiveRebaseLag.toInt256Safe()
+            );
             return defaultPositiveRebaseLag.toInt256Safe();
         }
-
     }
 
     function findBreakpoint(int256 supplyDelta, LagBreakpoint[] memory array)
         public
         returns (int256)
     {
-        uint256 index;
         LagBreakpoint memory instance;
 
-        for (index = 0; index < array.length; index = index.add(1)) {
+        for (uint256 index = 0; index < array.length; index = index.add(1)) {
             instance = array[index];
 
             if (supplyDelta < instance.lowerDelta) {
@@ -494,12 +455,21 @@ contract DebasePolicy is Ownable, Initializable {
      * @param defaultPositiveRebaseLag_ The new positive rebase lag parameter.
      * @param defaultNegativeRebaseLag_ The new negative rebase lag parameter.
      */
-    function setDefaultRebaseLags(uint256 defaultPositiveRebaseLag_,uint256 defaultNegativeRebaseLag_) external onlyOwner {
-        require(defaultPositiveRebaseLag_ > 0 && defaultNegativeRebaseLag_ > 0, "Lag must be greater than zero");
+    function setDefaultRebaseLags(
+        uint256 defaultPositiveRebaseLag_,
+        uint256 defaultNegativeRebaseLag_
+    ) external onlyOwner {
+        require(
+            defaultPositiveRebaseLag_ > 0 && defaultNegativeRebaseLag_ > 0,
+            "Lag must be greater than zero"
+        );
 
         defaultPositiveRebaseLag = defaultPositiveRebaseLag_;
         defaultNegativeRebaseLag = defaultNegativeRebaseLag_;
-        emit LogSetDefaultRebaseLag(defaultPositiveRebaseLag,defaultNegativeRebaseLag);
+        emit LogSetDefaultRebaseLag(
+            defaultPositiveRebaseLag,
+            defaultNegativeRebaseLag
+        );
     }
 
     /**
