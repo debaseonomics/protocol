@@ -208,19 +208,18 @@ contract StabilizerPool is
      */
     function checkStabilizerCondition(
         int256 supplyDelta_,
-        uint256 exchangeRate_,
-        uint256 rewardAmount_
+        uint256 exchangeRate_
     ) external returns (bool) {
         require(msg.sender == policy, "Only policy contract can call this");
         if (supplyDelta_ == 0) {
             count = count.add(1);
 
             if (count >= countThreshold) {
+                count = 0;
                 if (beforePeriodFinish || now >= periodFinish) {
-                    notifyRewardAmount(rewardAmount_);
+                    notifyRewardAmount(rewardAmount);
                     return true;
                 }
-                count = 0;
             }
         } else if (countInSequence) {
             count = 0;
@@ -234,21 +233,22 @@ contract StabilizerPool is
     }
 
     /**
-     * @notice Function to enable or disable  s should be in sequence
-     * @param countInSequence_ Flag to set  in sequence
+     * @notice Function to enable or disable count should be in sequence
      */
-    function setCountInSequence(bool countInSequence_) external onlyOwner {
-        countInSequence = countInSequence_;
-        emit LogCountInSequence(countInSequence);
+    function setCountInSequence() external onlyOwner {
+        countInSequence = !countInSequence;
+        count = 0;
+        emit LogCountInSequence(!countInSequence);
     }
 
     /**
-     * @notice Function to set the   threshold
+     * @notice Function to set the count threshold
      * @param countThreshold_ The new threshold
      */
     function setCountThreshold(uint256 countThreshold_) external onlyOwner {
         require(countThreshold_ >= 1);
         countThreshold = countThreshold_;
+        count = 0;
         emit LogCountThreshold(countThreshold);
     }
 
@@ -271,6 +271,7 @@ contract StabilizerPool is
 
     function setPoolEnabled() external onlyOwner {
         poolEnabled = !poolEnabled;
+        count = 0;
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {
