@@ -435,7 +435,7 @@ contract DebasePolicy is Ownable, Initializable {
                 //Gab in break points found
                 break;
             }
-            if (supplyDelta < instance.upperDelta) {
+            if (supplyDelta <= instance.upperDelta) {
                 emit LogSelectedBreakpoint(
                     instance.lowerDelta,
                     instance.upperDelta,
@@ -499,9 +499,9 @@ contract DebasePolicy is Ownable, Initializable {
         int256 upperDelta_,
         int256 lag_
     ) public onlyOwner {
-        require(lag_ > 0, "Lag must be greater than 0");
 
-        require(lowerDelta_ >= 0 && lowerDelta_ < upperDelta_);
+        require(lowerDelta_ >= 0 && lowerDelta_ < upperDelta_,"Lower delta must be less than upper delta");
+        require(lag_ > 0,"Lag can't be zero");
 
         LagBreakpoint memory newPoint = LagBreakpoint(
             lowerDelta_,
@@ -549,7 +549,8 @@ contract DebasePolicy is Ownable, Initializable {
     ) public onlyOwner {
         LagBreakpoint storage instance;
 
-        require(lowerDelta_ >= 0 && lowerDelta_ < upperDelta_);
+        require(lowerDelta_ >= 0 && lowerDelta_ < upperDelta_,"Lower delta must be less than upper delta");
+        require(lag_ > 0,"Lag can't be zero");
 
         if (select) {
             withinPointRange(
@@ -587,7 +588,11 @@ contract DebasePolicy is Ownable, Initializable {
         LagBreakpoint memory lowerPoint;
         LagBreakpoint memory upperPoint;
 
-        if (index == 0 && length == 2) {
+
+        if (index == 0) {
+            if (length == 1){
+                return;
+            }
             upperPoint = array[index.add(1)];
             require(upperDelta_ <= upperPoint.lowerDelta);
         } else if (index == length.sub(1)) {

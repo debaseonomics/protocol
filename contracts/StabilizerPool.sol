@@ -113,7 +113,7 @@ contract StabilizerPool is
 
     string public poolName;
     IERC20 public rewardToken;
-    address public orchestrator;
+    address public policy;
     uint256 public duration;
     bool public poolEnabled;
 
@@ -183,14 +183,14 @@ contract StabilizerPool is
         string memory poolName_,
         address rewardToken_,
         address pairToken_,
-        address orchestrator_,
+        address policy_,
         uint256 rewardAmount_,
         uint256 duration_
     ) public initializer {
         poolName = poolName_;
         setStakeToken(genUniAddr(rewardToken_, pairToken_));
         rewardToken = IERC20(rewardToken_);
-        orchestrator = orchestrator_;
+        policy = policy_;
         duration = duration_;
         poolEnabled = false;
 
@@ -211,6 +211,7 @@ contract StabilizerPool is
         uint256 exchangeRate_,
         uint256 rewardAmount_
     ) external returns (bool) {
+        require(msg.sender == policy, "Only policy contract can call this");
         if (supplyDelta_ == 0) {
             count = count.add(1);
 
