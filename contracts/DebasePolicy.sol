@@ -29,6 +29,7 @@ interface StabilizerI {
 
     function checkStabilizerCondition(
         int256 supplyDelta_,
+        int256 rebaseLag_,
         uint256 exchangeRate_
     ) external returns (bool);
 
@@ -328,9 +329,6 @@ contract DebasePolicy is Ownable, Initializable {
         }
 
         int256 supplyDelta = computeSupplyDelta(exchangeRate, priceTargetRate);
-
-        checkStabilizers(supplyDelta, exchangeRate);
-
         int256 rebaseLag;
 
         if (supplyDelta != 0) {
@@ -348,14 +346,18 @@ contract DebasePolicy is Ownable, Initializable {
             supplyDelta = (MAX_SUPPLY.sub(debase.totalSupply())).toInt256Safe();
         }
 
+        checkStabilizers(supplyDelta, rebaseLag, exchangeRate);
+
         uint256 supplyAfterRebase = debase.rebase(epoch, supplyDelta);
         assert(supplyAfterRebase <= MAX_SUPPLY);
         emit LogRebase(epoch, exchangeRate, supplyDelta, rebaseLag, now);
     }
 
-    function checkStabilizers(int256 supplyDelta_, uint256 exchangeRate_)
-        internal
-    {
+    function checkStabilizers(
+        int256 supplyDelta_,
+        int256 rebaseLag_,
+        uint256 exchangeRate_
+    ) internal {
         for (
             uint256 index = 0;
             index < stabilizerPools.length;
@@ -366,6 +368,7 @@ contract DebasePolicy is Ownable, Initializable {
                 instance.enabled &&
                 instance.pool.checkStabilizerCondition(
                     supplyDelta_,
+                    rebaseLag_,
                     exchangeRate_
                 )
             ) {
@@ -499,9 +502,11 @@ contract DebasePolicy is Ownable, Initializable {
         int256 upperDelta_,
         int256 lag_
     ) public onlyOwner {
-
-        require(lowerDelta_ >= 0 && lowerDelta_ < upperDelta_,"Lower delta must be less than upper delta");
-        require(lag_ > 0,"Lag can't be zero");
+        require(
+            lowerDelta_ >= 0 && lowerDelta_ < upperDelta_,
+            "Lower delta must be less than upper delta"
+        );
+        require(lag_ > 0, "Lag can't be zero");
 
         LagBreakpoint memory newPoint = LagBreakpoint(
             lowerDelta_,
@@ -549,8 +554,11 @@ contract DebasePolicy is Ownable, Initializable {
     ) public onlyOwner {
         LagBreakpoint storage instance;
 
-        require(lowerDelta_ >= 0 && lowerDelta_ < upperDelta_,"Lower delta must be less than upper delta");
-        require(lag_ > 0,"Lag can't be zero");
+        require(
+            lowerDelta_ >= 0 && lowerDelta_ < upperDelta_,
+            "Lower delta must be less than upper delta"
+        );
+        require(lag_ > 0, "Lag can't be zero");
 
         if (select) {
             withinPointRange(
@@ -588,9 +596,8 @@ contract DebasePolicy is Ownable, Initializable {
         LagBreakpoint memory lowerPoint;
         LagBreakpoint memory upperPoint;
 
-
         if (index == 0) {
-            if (length == 1){
+            if (length == 1) {
                 return;
             }
             upperPoint = array[index.add(1)];

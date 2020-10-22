@@ -48,7 +48,7 @@ contract Orchestrator is Ownable, Initializable {
     PoolI public debaseDaiPool;
     PoolI public debaseDaiLpPool;
 
-    PoolI public degovDebasePool;
+    PoolI public degovDaiLpPool;
     bool public rebaseStarted;
     uint256 public maximumRebaseTime;
     uint256 public rebaseRequiredSupply;
@@ -101,7 +101,7 @@ contract Orchestrator is Ownable, Initializable {
         address debasePolicy_,
         address debaseDaiPool_,
         address debaseDaiLpPool_,
-        address degovDebasePool_,
+        address degovDaiLpPool_,
         uint256 rebaseRequiredSupply_,
         uint256 oracleStartTimeOffset
     ) external initializer {
@@ -110,7 +110,7 @@ contract Orchestrator is Ownable, Initializable {
 
         debaseDaiPool = PoolI(debaseDaiPool_);
         debaseDaiLpPool = PoolI(debaseDaiLpPool_);
-        degovDebasePool = PoolI(degovDebasePool_);
+        degovDaiLpPool = PoolI(degovDaiLpPool_);
 
         maximumRebaseTime = block.timestamp + oracleStartTimeOffset;
         rebaseStarted = false;
@@ -156,7 +156,7 @@ contract Orchestrator is Ownable, Initializable {
             );
 
             //Start degov reward drop
-            degovDebasePool.startPool();
+            degovDaiLpPool.startPool();
             rebaseStarted = true;
             emit LogRebaseStarted(block.timestamp);
         }

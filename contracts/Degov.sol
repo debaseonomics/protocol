@@ -69,10 +69,10 @@ contract Degov is ERC20, Ownable, Initializable {
 
     /**
      * @notice Initialize the token with policy address and pool for the token distribution
-     * @param degovDebasePool_ Address of the pool contract where newly minted degov tokens are sent.
+     * @param degovDaiLpPool_ Address of the pool contract where newly minted degov tokens are sent.
      */
-    function initialize(address degovDebasePool_) external initializer {
-        _mint(degovDebasePool_, TOTAL_SUPPLY);
+    function initialize(address degovDaiLpPool_) external initializer {
+        _mint(degovDaiLpPool_, TOTAL_SUPPLY);
 
     }
 

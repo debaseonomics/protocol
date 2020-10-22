@@ -57,9 +57,9 @@ async function main() {
 			signer[0]
 		)) as any) as StakingPool;
 
-		const degovDebasePool = ((await ethers.getContractAt(
+		const degovDaiLpPool = ((await ethers.getContractAt(
 			StakingPoolArtifact.abi,
-			dataParse['degovDebasePool'],
+			dataParse['degovDaiLpPool'],
 			signer[0]
 		)) as any) as StakingPool;
 
@@ -73,12 +73,6 @@ async function main() {
 			dataParse['orchestrator'],
 			signer[0]
 		)) as any) as Orchestrator;
-
-		const debaseDaiLpStabilizerPool = ((await ethers.getContractAt(
-			StabilizerPoolArtifact.abi,
-			dataParse['debaseDaiLpStabilizerPool'],
-			signer[0]
-		)) as any) as StabilizerPool;
 
 		const min_5 = 5 * 60;
 		const min_30 = 30 * 60;
@@ -121,30 +115,7 @@ async function main() {
 			startTimeOffset: 1
 		};
 
-		const degovDebasePoolParams = {
-			name: 'Degov/Debase Pool', //name
-			rewardToken: degov.address, // Reward Token
-			pairToken: debase.address, // Stake Token
-			isUniLp: false,
-			orchestrator: orchestrator.address,
-			halvingDuration: two_hour,
-			fairDistribution: true,
-			fairDistributionTokenLimit: 5000,
-			fairDistributionTimeLimit: two_days,
-			manualPoolStart: true,
-			startTimeOffset: 0
-		};
-
-		const debaseDaiLpStabilizerPoolParams = {
-			name: 'Debase/DAI-LP Pool', //name
-			rewardToken: debase.address, // Reward Token
-			pairToken: dataParse['dai'], // Stake Token
-			policy: debasePolicy.address,
-			rewardAmount: parseEther('1000'),
-			duration: one_hour
-		};
-
-		let transaction = await degov.initialize(degovDebasePool.address);
+		let transaction = await degov.initialize(degovDaiLpPool.address);
 		await transaction.wait(1);
 
 		transaction = await debase.initialize(
@@ -186,27 +157,36 @@ async function main() {
 			debaseDaiLpPoolParams.startTimeOffset // Start Time offset
 		);
 
-		await degovDebasePool.initialize(
-			degovDebasePoolParams.name, //name
-			degovDebasePoolParams.rewardToken, // Reward Token
-			degovDebasePoolParams.pairToken, // Stake Token
-			degovDebasePoolParams.isUniLp,
-			degovDebasePoolParams.orchestrator,
-			degovDebasePoolParams.halvingDuration, // Duration
-			degovDebasePoolParams.fairDistribution, // Fair flag
-			degovDebasePoolParams.fairDistributionTokenLimit, // Fair token limit
-			degovDebasePoolParams.fairDistributionTimeLimit, // Fair token time limit
-			degovDebasePoolParams.manualPoolStart, // Manual start pool
-			degovDebasePoolParams.startTimeOffset // Start Time offset
-		);
+		await transaction.wait(1);
+		const lp = await debaseDaiLpPool.y();
+		console.log(lp);
 
-		await debaseDaiLpStabilizerPool.initialize(
-			debaseDaiLpStabilizerPoolParams.name,
-			debaseDaiLpStabilizerPoolParams.rewardToken,
-			debaseDaiLpStabilizerPoolParams.pairToken,
-			debaseDaiLpStabilizerPoolParams.policy,
-			debaseDaiLpStabilizerPoolParams.rewardAmount,
-			debaseDaiLpStabilizerPoolParams.duration
+		const degovDaiLpPoolParams = {
+			name: 'Degov/Dai-Lp Pool', //name
+			rewardToken: degov.address, // Reward Token
+			pairToken: lp, // Stake Token
+			isUniLp: false,
+			orchestrator: orchestrator.address,
+			halvingDuration: two_hour,
+			fairDistribution: true,
+			fairDistributionTokenLimit: 5000,
+			fairDistributionTimeLimit: two_days,
+			manualPoolStart: true,
+			startTimeOffset: 0
+		};
+
+		transaction = await degovDaiLpPool.initialize(
+			degovDaiLpPoolParams.name, //name
+			degovDaiLpPoolParams.rewardToken, // Reward Token
+			degovDaiLpPoolParams.pairToken, // Stake Token
+			degovDaiLpPoolParams.isUniLp,
+			degovDaiLpPoolParams.orchestrator,
+			degovDaiLpPoolParams.halvingDuration, // Duration
+			degovDaiLpPoolParams.fairDistribution, // Fair flag
+			degovDaiLpPoolParams.fairDistributionTokenLimit, // Fair token limit
+			degovDaiLpPoolParams.fairDistributionTimeLimit, // Fair token time limit
+			degovDaiLpPoolParams.manualPoolStart, // Manual start pool
+			degovDaiLpPoolParams.startTimeOffset // Start Time offset
 		);
 
 		await governorAlpha.initialize(timelock.address, degov.address);
@@ -218,7 +198,7 @@ async function main() {
 			debasePolicy.address,
 			debaseDaiPool.address,
 			debaseDaiLpPool.address,
-			degovDebasePool.address,
+			degovDaiLpPool.address,
 			rebaseRequiredSupply_,
 			three_weeks
 		);
@@ -226,6 +206,10 @@ async function main() {
 		transaction.wait(1);
 
 		await orchestrator.addPair(debase.address, dataParse['dai']);
+
+		dataParse['debaseDaiLp'] = lp;
+		const updatedData = JSON.stringify(dataParse);
+		await promises.writeFile('contracts.json', updatedData);
 	} catch (error) {
 		console.log(error);
 	}

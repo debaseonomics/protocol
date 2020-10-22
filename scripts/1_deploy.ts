@@ -80,12 +80,11 @@ async function main() {
 		timelock: '',
 		debaseDaiPool: '',
 		debaseDaiLpPool: '',
-		degovDebasePool: '',
+		degovDaiLpPool: '',
 		orchestrator: '',
 		dai: '0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea',
 		debaseDaiLp: '',
-		oracle: '',
-		debaseDaiLpStabilizerPool: ''
+		oracle: ''
 	};
 
 	try {
@@ -99,8 +98,7 @@ async function main() {
 
 		const debaseDaiPool = await stakingPoolFactory.deploy();
 		const debaseDaiLpPool = await stakingPoolFactory.deploy();
-		const degovDebasePool = await stakingPoolFactory.deploy();
-		const debaseDaiLpStabilizerPool = await stabilizerPoolFactory.deploy();
+		const degovDaiLpPool = await stakingPoolFactory.deploy();
 
 		contractAddresses.degov = degov.address;
 		contractAddresses.debase = debase.address;
@@ -112,9 +110,7 @@ async function main() {
 
 		contractAddresses.debaseDaiPool = debaseDaiPool.address;
 		contractAddresses.debaseDaiLpPool = debaseDaiLpPool.address;
-		contractAddresses.degovDebasePool = degovDebasePool.address;
-
-		contractAddresses.debaseDaiLpStabilizerPool = debaseDaiLpStabilizerPool.address;
+		contractAddresses.degovDaiLpPool = degovDaiLpPool.address;
 
 		const data = JSON.stringify(contractAddresses);
 		await promises.writeFile('contracts.json', data);

@@ -208,6 +208,7 @@ contract StabilizerPool is
      */
     function checkStabilizerCondition(
         int256 supplyDelta_,
+        int256 rebaseLag_,
         uint256 exchangeRate_
     ) external returns (bool) {
         require(msg.sender == policy, "Only policy contract can call this");
