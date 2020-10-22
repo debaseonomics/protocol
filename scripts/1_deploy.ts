@@ -80,13 +80,10 @@ async function main() {
 		timelock: '',
 		debaseDaiPool: '',
 		debaseDaiLpPool: '',
-		degovUsdcPool: '',
-		degovUsdcLpPool: '',
+		degovDebasePool: '',
 		orchestrator: '',
 		dai: '0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea',
-		usdc: '0x4dbcdf9b62e891a7cec5a2568c3f4faf9e8abe2b',
 		debaseDaiLp: '',
-		degovUsdcLp: '',
 		oracle: '',
 		debaseDaiLpStabilizerPool: ''
 	};
@@ -102,8 +99,7 @@ async function main() {
 
 		const debaseDaiPool = await stakingPoolFactory.deploy();
 		const debaseDaiLpPool = await stakingPoolFactory.deploy();
-		const degovUsdcPool = await stakingPoolFactory.deploy();
-		const degovUsdcLpPool = await stakingPoolFactory.deploy();
+		const degovDebasePool = await stakingPoolFactory.deploy();
 		const debaseDaiLpStabilizerPool = await stabilizerPoolFactory.deploy();
 
 		contractAddresses.degov = degov.address;
@@ -116,8 +112,7 @@ async function main() {
 
 		contractAddresses.debaseDaiPool = debaseDaiPool.address;
 		contractAddresses.debaseDaiLpPool = debaseDaiLpPool.address;
-		contractAddresses.degovUsdcPool = degovUsdcPool.address;
-		contractAddresses.degovUsdcLpPool = degovUsdcLpPool.address;
+		contractAddresses.degovDebasePool = degovDebasePool.address;
 
 		contractAddresses.debaseDaiLpStabilizerPool = debaseDaiLpStabilizerPool.address;
 

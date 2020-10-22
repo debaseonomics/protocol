@@ -57,15 +57,9 @@ async function main() {
 			signer[0]
 		)) as any) as StakingPool;
 
-		const degovUsdcPool = ((await ethers.getContractAt(
+		const degovDebasePool = ((await ethers.getContractAt(
 			StakingPoolArtifact.abi,
-			dataParse['degovUsdcPool'],
-			signer[0]
-		)) as any) as StakingPool;
-
-		const degovUsdcLpPool = ((await ethers.getContractAt(
-			StakingPoolArtifact.abi,
-			dataParse['degovUsdcLpPool'],
+			dataParse['degovDebasePool'],
 			signer[0]
 		)) as any) as StakingPool;
 
@@ -127,10 +121,10 @@ async function main() {
 			startTimeOffset: 1
 		};
 
-		const degovUsdcPoolParams = {
-			name: 'Debase/USDC Pool', //name
+		const degovDebasePoolParams = {
+			name: 'Degov/Debase Pool', //name
 			rewardToken: degov.address, // Reward Token
-			pairToken: dataParse['usdc'], // Stake Token
+			pairToken: debase.address, // Stake Token
 			isUniLp: false,
 			orchestrator: orchestrator.address,
 			halvingDuration: two_hour,
@@ -141,29 +135,16 @@ async function main() {
 			startTimeOffset: 0
 		};
 
-		const degovUsdcLpPoolParams = {
-			name: 'Debase/USDC-LP Pool', //name
-			rewardToken: degov.address, // Reward Token
-			pairToken: dataParse['usdc'], // Stake Token
-			isUniLp: true,
-			orchestrator: orchestrator.address,
-			halvingDuration: two_hour,
-			fairDistribution: false,
-			fairDistributionTokenLimit: 0,
-			fairDistributionTimeLimit: 0,
-			manualPoolStart: true,
-			startTimeOffset: 0
-		};
-
 		const debaseDaiLpStabilizerPoolParams = {
 			name: 'Debase/DAI-LP Pool', //name
 			rewardToken: debase.address, // Reward Token
 			pairToken: dataParse['dai'], // Stake Token
-			orchestrator: orchestrator.address,
+			policy: debasePolicy.address,
+			rewardAmount: parseEther('1000'),
 			duration: one_hour
 		};
 
-		let transaction = await degov.initialize(degovUsdcPool.address, 25, degovUsdcLpPool.address, 75);
+		let transaction = await degov.initialize(degovDebasePool.address);
 		await transaction.wait(1);
 
 		transaction = await debase.initialize(
@@ -176,7 +157,7 @@ async function main() {
 		);
 		await transaction.wait(1);
 
-		await debasePolicy.initialize(debase.address, orchestrator.address, debaseDaiLpStabilizerPool.address);
+		await debasePolicy.initialize(debase.address, orchestrator.address);
 
 		await debaseDaiPool.initialize(
 			debaseDaiPoolParams.name, //name
@@ -205,42 +186,26 @@ async function main() {
 			debaseDaiLpPoolParams.startTimeOffset // Start Time offset
 		);
 
-		transaction = await debaseDaiLpStabilizerPool.setRewardDistribution(debasePolicy.address);
-		await transaction.wait(1);
-
-		await degovUsdcPool.initialize(
-			degovUsdcPoolParams.name, //name
-			degovUsdcPoolParams.rewardToken, // Reward Token
-			degovUsdcPoolParams.pairToken, // Stake Token
-			degovUsdcPoolParams.isUniLp,
-			degovUsdcPoolParams.orchestrator,
-			degovUsdcPoolParams.halvingDuration, // Duration
-			degovUsdcPoolParams.fairDistribution, // Fair flag
-			degovUsdcPoolParams.fairDistributionTokenLimit, // Fair token limit
-			degovUsdcPoolParams.fairDistributionTimeLimit, // Fair token time limit
-			degovUsdcPoolParams.manualPoolStart, // Manual start pool
-			degovUsdcPoolParams.startTimeOffset // Start Time offset
-		);
-
-		await degovUsdcLpPool.initialize(
-			degovUsdcLpPoolParams.name, //name
-			degovUsdcLpPoolParams.rewardToken, // Reward Token
-			degovUsdcLpPoolParams.pairToken, // Stake Token
-			degovUsdcLpPoolParams.isUniLp,
-			degovUsdcLpPoolParams.orchestrator,
-			degovUsdcLpPoolParams.halvingDuration, // Duration
-			degovUsdcLpPoolParams.fairDistribution, // Fair flag
-			degovUsdcLpPoolParams.fairDistributionTokenLimit, // Fair token limit
-			degovUsdcLpPoolParams.fairDistributionTimeLimit, // Fair token time limit
-			degovUsdcLpPoolParams.manualPoolStart, // Manual start pool
-			degovUsdcLpPoolParams.startTimeOffset // Start Time offset
+		await degovDebasePool.initialize(
+			degovDebasePoolParams.name, //name
+			degovDebasePoolParams.rewardToken, // Reward Token
+			degovDebasePoolParams.pairToken, // Stake Token
+			degovDebasePoolParams.isUniLp,
+			degovDebasePoolParams.orchestrator,
+			degovDebasePoolParams.halvingDuration, // Duration
+			degovDebasePoolParams.fairDistribution, // Fair flag
+			degovDebasePoolParams.fairDistributionTokenLimit, // Fair token limit
+			degovDebasePoolParams.fairDistributionTimeLimit, // Fair token time limit
+			degovDebasePoolParams.manualPoolStart, // Manual start pool
+			degovDebasePoolParams.startTimeOffset // Start Time offset
 		);
 
 		await debaseDaiLpStabilizerPool.initialize(
 			debaseDaiLpStabilizerPoolParams.name,
 			debaseDaiLpStabilizerPoolParams.rewardToken,
 			debaseDaiLpStabilizerPoolParams.pairToken,
-			debaseDaiLpStabilizerPoolParams.orchestrator,
+			debaseDaiLpStabilizerPoolParams.policy,
+			debaseDaiLpStabilizerPoolParams.rewardAmount,
 			debaseDaiLpStabilizerPoolParams.duration
 		);
 
@@ -253,9 +218,7 @@ async function main() {
 			debasePolicy.address,
 			debaseDaiPool.address,
 			debaseDaiLpPool.address,
-			degovUsdcPool.address,
-			degovUsdcLpPool.address,
-			debaseDaiLpStabilizerPool.address,
+			degovDebasePool.address,
 			rebaseRequiredSupply_,
 			three_weeks
 		);

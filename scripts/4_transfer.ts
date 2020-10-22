@@ -54,15 +54,16 @@ async function main() {
 		let balance = (await signer[0].getBalance()).toString();
 		console.log('Balance before transfer ownership', ethers.utils.formatEther(balance));
 
-		await timelock.transferOwnership(timelock.address);
-		await degov.transferOwnership(timelock.address);
-		await governorAlpha.transferOwnership(timelock.address);
-		await debasePolicy.transferOwnership(timelock.address);
-		await orchestrator.transferOwnership(timelock.address);
-		await debaseDaiLpStabilizerPool.transferOwnership(timelock.address);
+		// await timelock.transferOwnership(timelock.address);
+		// await degov.transferOwnership(timelock.address);
+		// await governorAlpha.transferOwnership(timelock.address);
+		// await debasePolicy.transferOwnership(timelock.address);
+		// await orchestrator.transferOwnership(timelock.address);
+		// await debaseDaiLpStabilizerPool.transferOwnership(timelock.address);
 
-		balance = (await signer[0].getBalance()).toString();
-		console.log('Balance after transfer ownership', ethers.utils.formatEther(balance));
+		await orchestrator.rebase();
+		// balance = (await signer[0].getBalance()).toString();
+		// console.log('Balance after transfer ownership', ethers.utils.formatEther(balance));
 	} catch (error) {
 		console.log(error);
 	}
