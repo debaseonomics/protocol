@@ -57,7 +57,11 @@ library SafeMath {
      *
      * - Subtraction cannot overflow.
      */
-    function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+    function sub(
+        uint256 a,
+        uint256 b,
+        string memory errorMessage
+    ) internal pure returns (uint256) {
         require(b <= a, errorMessage);
         uint256 c = a - b;
 
@@ -116,7 +120,11 @@ library SafeMath {
      *
      * - The divisor cannot be zero.
      */
-    function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+    function div(
+        uint256 a,
+        uint256 b,
+        string memory errorMessage
+    ) internal pure returns (uint256) {
         require(b > 0, errorMessage);
         uint256 c = a / b;
         // assert(a == b * c + a % b); // There is no case in which this doesn't hold
@@ -152,17 +160,15 @@ library SafeMath {
      *
      * - The divisor cannot be zero.
      */
-    function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+    function mod(
+        uint256 a,
+        uint256 b,
+        string memory errorMessage
+    ) internal pure returns (uint256) {
         require(b != 0, errorMessage);
         return a % b;
     }
 }
-
-// File: @openzeppelin/contracts/GSN/Context.sol
-
-
-
-
 
 /*
  * @dev Provides information about the current execution context, including the
@@ -175,21 +181,15 @@ library SafeMath {
  * This contract is only required for intermediate, library-like contracts.
  */
 abstract contract Context {
-    function _msgSender() internal view virtual returns (address payable) {
+    function _msgSender() internal virtual view returns (address payable) {
         return msg.sender;
     }
 
-    function _msgData() internal view virtual returns (bytes memory) {
+    function _msgData() internal virtual view returns (bytes memory) {
         this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
         return msg.data;
     }
 }
-
-// File: @openzeppelin/contracts/access/Ownable.sol
-
-
-
-
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where
@@ -206,12 +206,15 @@ abstract contract Context {
 contract Ownable is Context {
     address private _owner;
 
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
     /**
      * @dev Initializes the contract setting the deployer as the initial owner.
      */
-    constructor () internal {
+    constructor() internal {
         address msgSender = _msgSender();
         _owner = msgSender;
         emit OwnershipTransferred(address(0), msgSender);
@@ -249,12 +252,14 @@ contract Ownable is Context {
      * Can only be called by the current owner.
      */
     function transferOwnership(address newOwner) public virtual onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        require(
+            newOwner != address(0),
+            "Ownable: new owner is the zero address"
+        );
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
     }
 }
-
 
 /**
  * @title Initializable
@@ -269,53 +274,56 @@ contract Ownable is Context {
  * because this is not dealt with automatically as with constructors.
  */
 contract Initializable {
+    /**
+     * @dev Indicates that the contract has been initialized.
+     */
+    bool private initialized;
 
-  /**
-   * @dev Indicates that the contract has been initialized.
-   */
-  bool private initialized;
+    /**
+     * @dev Indicates that the contract is in the process of being initialized.
+     */
+    bool private initializing;
 
-  /**
-   * @dev Indicates that the contract is in the process of being initialized.
-   */
-  bool private initializing;
+    /**
+     * @dev Modifier to use in the initializer function of a contract.
+     */
+    modifier initializer() {
+        require(
+            initializing || isConstructor() || !initialized,
+            "Contract instance has already been initialized"
+        );
 
-  /**
-   * @dev Modifier to use in the initializer function of a contract.
-   */
-  modifier initializer() {
-    require(initializing || isConstructor() || !initialized, "Contract instance has already been initialized");
+        bool isTopLevelCall = !initializing;
+        if (isTopLevelCall) {
+            initializing = true;
+            initialized = true;
+        }
 
-    bool isTopLevelCall = !initializing;
-    if (isTopLevelCall) {
-      initializing = true;
-      initialized = true;
+        _;
+
+        if (isTopLevelCall) {
+            initializing = false;
+        }
     }
 
-    _;
-
-    if (isTopLevelCall) {
-      initializing = false;
+    /// @dev Returns true if and only if the function is running in the constructor
+    function isConstructor() private view returns (bool) {
+        // extcodesize checks the size of the code stored in an address, and
+        // address returns the current address. Since the code is still not
+        // deployed when running a constructor, any checks on its code size will
+        // yield zero, making it an effective way to detect if a contract is
+        // under construction or not.
+        address self = address(this);
+        uint256 cs;
+        assembly {
+            cs := extcodesize(self)
+        }
+        return cs == 0;
     }
-  }
 
-  /// @dev Returns true if and only if the function is running in the constructor
-  function isConstructor() private view returns (bool) {
-    // extcodesize checks the size of the code stored in an address, and
-    // address returns the current address. Since the code is still not
-    // deployed when running a constructor, any checks on its code size will
-    // yield zero, making it an effective way to detect if a contract is
-    // under construction or not.
-    address self = address(this);
-    uint256 cs;
-    assembly { cs := extcodesize(self) }
-    return cs == 0;
-  }
-
-  // Reserved storage space to allow for layout changes in the future.
-  uint256[50] private ______gap;
+    // Reserved storage space to allow for layout changes in the future.
+    uint256[50] private ______gap;
 }
-
 
 contract Timelock is Initializable, Ownable {
     using SafeMath for uint256;
@@ -349,10 +357,9 @@ contract Timelock is Initializable, Ownable {
         uint256 eta_
     );
 
-    
     address public admin;
     address public pendingAdmin;
-    
+
     // The amount of delay after which a delay can a queued can be executed.
     uint256 public delay = 1 days;
     // The the period within which an queued proposal can be executed.
@@ -364,11 +371,7 @@ contract Timelock is Initializable, Ownable {
      * @notice Initializes timelock contract with the address of the governor/admin
      * @param admin_ Address of the timelock admin.
      */
-    function initialize(address admin_)
-        external
-        onlyOwner
-        initializer
-    {
+    function initialize(address admin_) external onlyOwner initializer {
         admin = admin_;
     }
 
@@ -413,7 +416,7 @@ contract Timelock is Initializable, Ownable {
         emit NewAdmin(admin);
     }
 
-    function setPendingAdmin(address pendingAdmin_) public onlyOwner {  
+    function setPendingAdmin(address pendingAdmin_) public onlyOwner {
         pendingAdmin = pendingAdmin_;
 
         emit NewPendingAdmin(pendingAdmin);
@@ -524,7 +527,6 @@ contract Timelock is Initializable, Ownable {
         return block.timestamp;
     }
 }
-
 
 interface DegovI {
     function totalSupply() external view returns (uint256);
