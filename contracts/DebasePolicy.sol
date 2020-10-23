@@ -80,7 +80,7 @@ contract DebasePolicy is Ownable, Initializable {
 
     event LogSetOracle(address oracle_);
 
-    event LogNewBreakpoint(
+    event LogNewLagBreakpoint(
         bool indexed selected,
         int256 indexed lowerDelta_,
         int256 indexed upperDelta_,
@@ -113,7 +113,7 @@ contract DebasePolicy is Ownable, Initializable {
 
     event LogAddNewStabilizerPool(StabilizerI pool_);
 
-    event LogToggleStabilizerPool(uint256 index_, bool enabled_);
+    event LogSetStabilizerPoolEnabled(uint256 index_, bool enabled_);
 
     event LogRewardSentToStabilizer(
         uint256 index,
@@ -207,6 +207,7 @@ contract DebasePolicy is Ownable, Initializable {
         );
         _;
     }
+    
 
     /**
      * @notice Initializes the debase policy with addresses of the debase token and the oracle deployer. Along with inital rebasing parameters
@@ -253,7 +254,7 @@ contract DebasePolicy is Ownable, Initializable {
         emit LogAddNewStabilizerPool(instance.pool);
     }
 
-    function removeStabilizerPool(uint256 index)
+    function deleteStabilizerPool(uint256 index)
         external
         indexInBounds(index)
         onlyOwner
@@ -269,16 +270,17 @@ contract DebasePolicy is Ownable, Initializable {
         }
         emit LogDeleteStabilizerPool(instanceToDelete.pool);
         stabilizerPools.pop();
+        delete instanceToDelete;
     }
 
-    function toggleStabilizerPool(uint256 index)
+    function setStabilizerPoolEnabled(uint256 index,bool enabled)
         external
         indexInBounds(index)
         onlyOwner
     {
         StabilizerPool storage instance = stabilizerPools[index];
-        instance.enabled = !instance.enabled;
-        emit LogToggleStabilizerPool(index, instance.enabled);
+        instance.enabled = enabled;
+        emit LogSetStabilizerPoolEnabled(index, instance.enabled);
     }
 
     /**
@@ -534,7 +536,7 @@ contract DebasePolicy is Ownable, Initializable {
 
             lowerLagBreakpoints.push(newPoint);
         }
-        emit LogNewBreakpoint(select, lowerDelta_, upperDelta_, lag_);
+        emit LogNewLagBreakpoint(select, lowerDelta_, upperDelta_, lag_);
     }
 
     /**
@@ -620,28 +622,29 @@ contract DebasePolicy is Ownable, Initializable {
      * @param select Whether to delete from upper or lower breakpoint array.
      */
     function deleteLagBreakpoint(bool select) public onlyOwner {
-        LagBreakpoint memory instance;
+        LagBreakpoint memory instanceToDelete;
         if (select) {
             require(
                 upperLagBreakpoints.length > 0,
                 "Can't delete empty breakpoint array"
             );
-            instance = upperLagBreakpoints[upperLagBreakpoints.length.sub(1)];
+            instanceToDelete = upperLagBreakpoints[upperLagBreakpoints.length.sub(1)];
             upperLagBreakpoints.pop();
         } else {
             require(
                 lowerLagBreakpoints.length > 0,
                 "Can't delete empty breakpoint array"
             );
-            instance = lowerLagBreakpoints[lowerLagBreakpoints.length.sub(1)];
+            instanceToDelete = lowerLagBreakpoints[lowerLagBreakpoints.length.sub(1)];
             lowerLagBreakpoints.pop();
         }
         emit LogDeleteBreakpoint(
             select,
-            instance.lowerDelta,
-            instance.upperDelta,
-            instance.lag
+            instanceToDelete.lowerDelta,
+            instanceToDelete.upperDelta,
+            instanceToDelete.lag
         );
+        delete instanceToDelete;
     }
 
     /**

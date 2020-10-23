@@ -110,6 +110,8 @@ contract StabilizerPool is
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
     event ManualPoolStarted(uint256 startedAt);
+    event LogSetDuration(uint256 duration);
+    event LogSetPoolEnabled(bool poolEnabled);
 
     string public poolName;
     IERC20 public rewardToken;
@@ -236,8 +238,8 @@ contract StabilizerPool is
     /**
      * @notice Function to enable or disable count should be in sequence
      */
-    function setCountInSequence() external onlyOwner {
-        countInSequence = !countInSequence;
+    function setCountInSequence(bool countInSequence_) external onlyOwner {
+        countInSequence = countInSequence_;
         count = 0;
         emit LogCountInSequence(!countInSequence);
     }
@@ -265,14 +267,24 @@ contract StabilizerPool is
         emit LogBeforePeriodFinish(beforePeriodFinish);
     }
 
+    /**
+     * @notice Function to set reward drop period
+     * @param duration_ New drop duration
+     */
     function setDuration(uint256 duration_) external onlyOwner {
         require(duration >= 1);
         duration = duration_;
+        emit LogSetDuration(duration);
     }
 
-    function setPoolEnabled() external onlyOwner {
-        poolEnabled = !poolEnabled;
+    /**
+     * @notice Function enabled or disable pool staking,withdraw
+     * @param poolEnabled_ Flag to toggle pool
+     */
+    function setPoolEnabled(bool poolEnabled_) external onlyOwner {
+        poolEnabled = poolEnabled_;
         count = 0;
+        emit LogSetPoolEnabled(poolEnabled);
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {

@@ -54,6 +54,9 @@ contract Orchestrator is Ownable, Initializable {
     uint256 public rebaseRequiredSupply;
 
     event LogRebaseStarted(uint256 timeStarted);
+    event LogAddNewUniPair(address token1,address token2);
+    event LogDeleteUniPair(bool enabled,address uniPair);
+    event LogSetUniPairEnabled(uint256 index, bool enabled);
 
     uint256 constant SYNC_GAS = 50000;
     address constant uniFactory = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
@@ -117,20 +120,29 @@ contract Orchestrator is Ownable, Initializable {
         rebaseRequiredSupply = rebaseRequiredSupply_;
     }
 
-    function addPair(address token1, address token2) external onlyOwner {
+    function addUniPair(address token1, address token2) external onlyOwner {
         uniSyncs.push(UniPair(true, genUniAddr(token1, token2)));
+
+        emit LogAddNewUniPair(token1,token2);
     }
 
-    function removePair(uint256 index) external onlyOwner indexInBounds(index) {
+    function deleteUniPair(uint256 index) external onlyOwner indexInBounds(index) {
+        UniPair memory instanceToDelete = uniSyncs[index];
+
         if (index < uniSyncs.length.sub(1)) {
             uniSyncs[index] = uniSyncs[uniSyncs.length.sub(1)];
         }
+        emit LogDeleteUniPair(instanceToDelete.enabled,address(instanceToDelete.pair));
+        
         uniSyncs.pop();
+        delete instanceToDelete;
     }
 
-    function togglePair(uint256 index) external onlyOwner indexInBounds(index) {
+    function setUniPairEnabled(uint256 index,bool enabled) external onlyOwner indexInBounds(index) {
         UniPair storage instance = uniSyncs[index];
-        instance.enabled = !instance.enabled;
+        instance.enabled = enabled;
+
+        emit LogSetUniPairEnabled(index,enabled);
     }
 
     /**

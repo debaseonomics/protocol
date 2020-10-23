@@ -103,7 +103,7 @@ contract Oracle is Ownable, ExampleOracleSimple {
     }
 
     /**
-     * @notice Function that must be called before the very first rebase of debase protocol to get an accurate price.
+     * @notice Function that must be called 24 hours before the very first rebase of debase protocol to get an accurate price.
      */
     function updateBeforeRebase() public onlyOwner {
         update();
