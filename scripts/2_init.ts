@@ -72,18 +72,14 @@ async function main() {
 			signer[0]
 		)) as any) as Orchestrator;
 
-		const min_5 = 5 * 60;
-		const min_30 = 30 * 60;
 		const one_hour = 60 * 60;
-		const two_hour = 2 * one_hour;
-		const four_hour = 4 * one_hour;
 		const one_day = 24 * one_hour;
 		const two_days = 2 * one_day;
 		const three_days = 3 * one_day;
-		const four_days = 4 * one_day;
+		const one_week = 7 * one_day;
 		const three_weeks = 21 * one_day;
 
-		const rebaseRequiredSupply_ = parseEther('500');
+		const rebaseRequiredSupply_ = parseEther('23750');
 
 		const debaseDaiPoolParams = {
 			name: 'Debase/DAI Pool', //name
@@ -91,12 +87,12 @@ async function main() {
 			pairToken: dataParse['dai'], // Stake Token
 			isUniLp: false,
 			orchestrator: orchestrator.address,
-			halvingDuration: one_hour,
+			halvingDuration: one_day,
 			fairDistribution: true,
 			fairDistributionTokenLimit: 10000,
 			fairDistributionTimeLimit: one_day,
 			manualPoolStart: false,
-			startTimeOffset: 1
+			startTimeOffset: one_hour
 		};
 
 		const debaseDaiLpPoolParams = {
@@ -105,12 +101,12 @@ async function main() {
 			pairToken: dataParse['dai'], // Stake Token
 			isUniLp: true,
 			orchestrator: orchestrator.address,
-			halvingDuration: two_hour,
+			halvingDuration: three_days,
 			fairDistribution: false,
 			fairDistributionTokenLimit: 0,
 			fairDistributionTimeLimit: 0,
 			manualPoolStart: false,
-			startTimeOffset: 1
+			startTimeOffset: one_hour
 		};
 
 		let transaction = await degov.initialize(degovDaiLpPool.address);
@@ -118,11 +114,11 @@ async function main() {
 
 		transaction = await debase.initialize(
 			debaseDaiPool.address,
-			10,
+			8,
 			debaseDaiLpPool.address,
-			30,
+			17,
 			debasePolicy.address,
-			60
+			75
 		);
 		await transaction.wait(1);
 
@@ -157,7 +153,6 @@ async function main() {
 
 		await transaction.wait(1);
 		const lp = await debaseDaiLpPool.y();
-		console.log(lp);
 
 		const degovDaiLpPoolParams = {
 			name: 'Degov/Dai-Lp Pool', //name
@@ -165,7 +160,7 @@ async function main() {
 			pairToken: lp, // Stake Token
 			isUniLp: false,
 			orchestrator: orchestrator.address,
-			halvingDuration: two_hour,
+			halvingDuration: one_week,
 			fairDistribution: true,
 			fairDistributionTokenLimit: 5000,
 			fairDistributionTimeLimit: two_days,
