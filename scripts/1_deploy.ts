@@ -33,36 +33,43 @@ async function main() {
 		DegovArtifact.bytecode,
 		signer[0]
 	) as any) as DegovFactory;
+
 	const governorAlphaFactory = (new ethers.ContractFactory(
 		GovernorAlphaArtifact.abi,
 		GovernorAlphaArtifact.bytecode,
 		signer[0]
 	) as any) as GovernorAlphaFactory;
+
 	const timeLockFactory = (new ethers.ContractFactory(
 		TimelockArtifact.abi,
 		TimelockArtifact.bytecode,
 		signer[0]
 	) as any) as TimelockFactory;
+
 	const stakingPoolFactory = (new ethers.ContractFactory(
 		StakingPoolArtifact.abi,
 		StakingPoolArtifact.bytecode,
 		signer[0]
 	) as any) as StakingPoolFactory;
+
 	const stabilizerPoolFactory = (new ethers.ContractFactory(
 		StabilizerPoolArtifact.abi,
 		StabilizerPoolArtifact.bytecode,
 		signer[0]
 	) as any) as StabilizerPoolFactory;
+
 	const debaseFactory = (new ethers.ContractFactory(
 		DebaseArtifact.abi,
 		DebaseArtifact.bytecode,
 		signer[0]
 	) as any) as DebaseFactory;
+
 	const debasePolicyFactory = (new ethers.ContractFactory(
 		DebasePolicyArtifact.abi,
 		DebasePolicyArtifact.bytecode,
 		signer[0]
 	) as any) as DebasePolicyFactory;
+
 	const orchestratorFactory = (new ethers.ContractFactory(
 		OrchestratorArtifact.abi,
 		OrchestratorArtifact.bytecode,
@@ -84,7 +91,8 @@ async function main() {
 		orchestrator: '',
 		dai: '0x5592ec0cfb4dbc12d3ab100b257153436a1f0fea',
 		debaseDaiLp: '',
-		oracle: ''
+		oracle: '',
+		stabilizerPool: ''
 	};
 
 	try {
@@ -99,6 +107,7 @@ async function main() {
 		const debaseDaiPool = await stakingPoolFactory.deploy();
 		const debaseDaiLpPool = await stakingPoolFactory.deploy();
 		const degovDaiLpPool = await stakingPoolFactory.deploy();
+		const stabilizerPool = await stabilizerPoolFactory.deploy();
 
 		contractAddresses.degov = degov.address;
 		contractAddresses.debase = debase.address;
@@ -111,6 +120,7 @@ async function main() {
 		contractAddresses.debaseDaiPool = debaseDaiPool.address;
 		contractAddresses.debaseDaiLpPool = debaseDaiLpPool.address;
 		contractAddresses.degovDaiLpPool = degovDaiLpPool.address;
+		contractAddresses.stabilizerPool = stabilizerPool.address;
 
 		const data = JSON.stringify(contractAddresses);
 		await promises.writeFile('contracts.json', data);

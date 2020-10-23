@@ -27,13 +27,12 @@ interface DebaseI {
 interface StabilizerI {
     function owner() external returns (address);
 
-    function checkStabilizerCondition(
+    function checkStabilizerAndGetReward(
         int256 supplyDelta_,
         int256 rebaseLag_,
-        uint256 exchangeRate_
-    ) external returns (bool);
-
-    function rewardAmount() external returns (uint256);
+        uint256 exchangeRate_,
+        uint256 debasePolicyBalance
+    ) external returns (uint256 rewardAmount_);
 }
 
 /**
@@ -207,7 +206,6 @@ contract DebasePolicy is Ownable, Initializable {
         );
         _;
     }
-    
 
     /**
      * @notice Initializes the debase policy with addresses of the debase token and the oracle deployer. Along with inital rebasing parameters
@@ -273,7 +271,7 @@ contract DebasePolicy is Ownable, Initializable {
         delete instanceToDelete;
     }
 
-    function setStabilizerPoolEnabled(uint256 index,bool enabled)
+    function setStabilizerPoolEnabled(uint256 index, bool enabled)
         external
         indexInBounds(index)
         onlyOwner
@@ -366,26 +364,22 @@ contract DebasePolicy is Ownable, Initializable {
             index = index.add(1)
         ) {
             StabilizerPool memory instance = stabilizerPools[index];
-            if (
-                instance.enabled &&
-                instance.pool.checkStabilizerCondition(
+            if (instance.enabled) {
+                uint256 rewardToTransfer = instance
+                    .pool
+                    .checkStabilizerAndGetReward(
                     supplyDelta_,
                     rebaseLag_,
-                    exchangeRate_
-                )
-            ) {
-                if (
-                    instance.pool.rewardAmount() <=
+                    exchangeRate_,
                     debase.balanceOf(address(this))
-                ) {
-                    debase.transfer(
-                        address(instance.pool),
-                        instance.pool.rewardAmount()
-                    );
+                );
+
+                if (rewardToTransfer != 0) {
+                    debase.transfer(address(instance.pool), rewardToTransfer);
                     emit LogRewardSentToStabilizer(
                         index,
                         instance.pool,
-                        instance.pool.rewardAmount()
+                        rewardToTransfer
                     );
                 }
             }
@@ -428,7 +422,7 @@ contract DebasePolicy is Ownable, Initializable {
     }
 
     function findBreakpoint(int256 supplyDelta, LagBreakpoint[] memory array)
-        public
+        internal
         returns (int256)
     {
         LagBreakpoint memory instance;
@@ -628,14 +622,18 @@ contract DebasePolicy is Ownable, Initializable {
                 upperLagBreakpoints.length > 0,
                 "Can't delete empty breakpoint array"
             );
-            instanceToDelete = upperLagBreakpoints[upperLagBreakpoints.length.sub(1)];
+            instanceToDelete = upperLagBreakpoints[upperLagBreakpoints
+                .length
+                .sub(1)];
             upperLagBreakpoints.pop();
         } else {
             require(
                 lowerLagBreakpoints.length > 0,
                 "Can't delete empty breakpoint array"
             );
-            instanceToDelete = lowerLagBreakpoints[lowerLagBreakpoints.length.sub(1)];
+            instanceToDelete = lowerLagBreakpoints[lowerLagBreakpoints
+                .length
+                .sub(1)];
             lowerLagBreakpoints.pop();
         }
         emit LogDeleteBreakpoint(

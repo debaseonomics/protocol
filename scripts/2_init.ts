@@ -7,14 +7,12 @@ import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
 import OrchestratorArtifact from '../artifacts/Orchestrator.json';
 import DegovArtifact from '../artifacts/Degov.json';
 import DebaseArtifact from '../artifacts/Debase.json';
-import StabilizerPoolArtifact from '../artifacts/StabilizerPool.json';
 
 import { Degov } from '../type/Degov';
 import { Debase } from '../type/Debase';
 import { GovernorAlpha } from '../type/GovernorAlpha';
 import { Timelock } from '../type/Timelock';
 import { StakingPool } from '../type/StakingPool';
-import { StabilizerPool } from '../type/StabilizerPool';
 import { DebasePolicy } from '../type/DebasePolicy';
 import { Orchestrator } from '../type/Orchestrator';
 import { promises } from 'fs';
@@ -205,7 +203,7 @@ async function main() {
 
 		transaction.wait(1);
 
-		await orchestrator.addPair(debase.address, dataParse['dai']);
+		await orchestrator.addUniPair(debase.address, dataParse['dai']);
 
 		dataParse['debaseDaiLp'] = lp;
 		const updatedData = JSON.stringify(dataParse);

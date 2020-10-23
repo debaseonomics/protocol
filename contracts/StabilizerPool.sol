@@ -138,8 +138,6 @@ contract StabilizerPool is
     // Flag to send reward before stabilizer pool period time finished
     bool public beforePeriodFinish;
 
-    address constant uniFactory = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
-
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
@@ -158,29 +156,6 @@ contract StabilizerPool is
         _;
     }
 
-    // https://uniswap.org/docs/v2/smart-contract-integration/getting-pair-addresses/
-    function genUniAddr(address left, address right)
-        internal
-        pure
-        returns (address)
-    {
-        address first = left < right ? left : right;
-        address second = left < right ? right : left;
-        address pair = address(
-            uint256(
-                keccak256(
-                    abi.encodePacked(
-                        hex"ff",
-                        uniFactory,
-                        keccak256(abi.encodePacked(first, second)),
-                        hex"96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f"
-                    )
-                )
-            )
-        );
-        return pair;
-    }
-
     function initialize(
         string memory poolName_,
         address rewardToken_,
@@ -190,7 +165,7 @@ contract StabilizerPool is
         uint256 duration_
     ) public initializer {
         poolName = poolName_;
-        setStakeToken(genUniAddr(rewardToken_, pairToken_));
+        setStakeToken(pairToken_);
         rewardToken = IERC20(rewardToken_);
         policy = policy_;
         duration = duration_;
@@ -208,26 +183,33 @@ contract StabilizerPool is
      * meets the set threshold. Then a precentage of debase tokens assigned to the policy contract will be transfered to the stabilizer pool.
      * With the added condition that the stabilizer pool has completed it's distribution period or a new flag is set to ovverride the time period.
      */
-    function checkStabilizerCondition(
+    function checkStabilizerAndGetReward(
         int256 supplyDelta_,
         int256 rebaseLag_,
-        uint256 exchangeRate_
-    ) external returns (bool) {
-        require(msg.sender == policy, "Only policy contract can call this");
-        if (supplyDelta_ == 0) {
-            count = count.add(1);
+        uint256 exchangeRate_,
+        uint256 debasePolicyBalance
+    ) external returns (uint256 rewardAmount_) {
+        require(
+            msg.sender == policy,
+            "Only debase policy contract can call this"
+        );
 
-            if (count >= countThreshold) {
-                count = 0;
-                if (beforePeriodFinish || now >= periodFinish) {
-                    notifyRewardAmount(rewardAmount);
-                    return true;
+        if (debasePolicyBalance >= rewardAmount) {
+            if (supplyDelta_ == 0) {
+                count = count.add(1);
+
+                if (count >= countThreshold) {
+                    count = 0;
+                    if (beforePeriodFinish || now >= periodFinish) {
+                        notifyRewardAmount(rewardAmount);
+                        return rewardAmount;
+                    }
                 }
+            } else if (countInSequence && count != 0) {
+                count = 0;
             }
-        } else if (countInSequence) {
-            count = 0;
         }
-        return false;
+        return 0;
     }
 
     function setRewardAmount(uint256 rewardAmount_) external onlyOwner {
