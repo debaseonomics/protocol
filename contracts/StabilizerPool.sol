@@ -194,20 +194,21 @@ contract StabilizerPool is
             "Only debase policy contract can call this"
         );
 
-        if (debasePolicyBalance >= rewardAmount) {
-            if (supplyDelta_ == 0) {
-                count = count.add(1);
+        if (supplyDelta_ == 0) {
+            count = count.add(1);
 
-                if (count >= countThreshold) {
-                    count = 0;
-                    if (beforePeriodFinish || now >= periodFinish) {
-                        notifyRewardAmount(rewardAmount);
-                        return rewardAmount;
-                    }
-                }
-            } else if (countInSequence && count != 0) {
+            if (count >= countThreshold) {
                 count = 0;
+                if (
+                    debasePolicyBalance >= rewardAmount &&
+                    (beforePeriodFinish || now >= periodFinish)
+                ) {
+                    notifyRewardAmount(rewardAmount);
+                    return rewardAmount;
+                }
             }
+        } else if (countInSequence && count != 0) {
+            count = 0;
         }
         return 0;
     }
