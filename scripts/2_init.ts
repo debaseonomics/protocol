@@ -74,12 +74,11 @@ async function main() {
 
 		const one_hour = 60 * 60;
 		const one_day = 24 * one_hour;
-		const two_days = 2 * one_day;
 		const three_days = 3 * one_day;
 		const one_week = 7 * one_day;
 		const three_weeks = 21 * one_day;
 
-		const rebaseRequiredSupply_ = parseEther('23750');
+		const rebaseRequiredSupply_ = parseEther('95000');
 
 		const debaseDaiPoolParams = {
 			name: 'Debase/DAI Pool', //name
@@ -114,11 +113,11 @@ async function main() {
 
 		transaction = await debase.initialize(
 			debaseDaiPool.address,
-			8,
+			3,
 			debaseDaiLpPool.address,
-			17,
+			7,
 			debasePolicy.address,
-			75
+			90
 		);
 		await transaction.wait(1);
 
@@ -161,9 +160,9 @@ async function main() {
 			isUniLp: false,
 			orchestrator: orchestrator.address,
 			halvingDuration: one_week,
-			fairDistribution: true,
-			fairDistributionTokenLimit: 5000,
-			fairDistributionTimeLimit: two_days,
+			fairDistribution: false,
+			fairDistributionTokenLimit: 0,
+			fairDistributionTimeLimit: 0,
 			manualPoolStart: true,
 			startTimeOffset: 0
 		};
