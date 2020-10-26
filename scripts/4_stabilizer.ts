@@ -34,8 +34,8 @@ async function main() {
 			dataParse['debase'],
 			dataParse['debaseDaiLp'],
 			dataParse['debasePolicy'],
-			parseEther('5000'),
-			3 * 24 * 60 * 60
+			parseEther('10000'),
+			4 * 24 * 60 * 60
 		);
 		await transaction.wait(1);
 		await debasePolicy.addNewStabilizerPool(stabilizerPool.address);
