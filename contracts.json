@@ -9,7 +9,7 @@
 	"degovDaiLpPool": "0x862DC46B337d27F617c1A3Dda6BBe53d0c1b5a67",
 	"orchestrator": "0xaA684CA36b59fcb4dfA59D74466CF707c722AA15",
 	"dai": "0x6b175474e89094c44da98b954eedeac495271d0f",
-	"debaseDaiLp": "",
+	"debaseDaiLp": "0x8ab3E1FaEb44B51E003a8BF1338B090Dd5247E50",
 	"oracle": "",
 	"stabilizerPool": "0x77bC944F7022B24bc12B7Be9Be07D7B4079CdF36"
 }
