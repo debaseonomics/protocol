@@ -1,7 +1,8 @@
-import { run, ethers } from '@nomiclabs/buidler';
 
-import OracleArtifact from '../artifacts/Oracle.json';
-import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
+import { run, ethers } from "hardhat";
+
+import OracleArtifact from '../artifacts/contracts/flattened/Oracle.sol/Oracle.json';
+import DebasePolicyArtifact from '../artifacts/contracts/flattened/DebasePolicy.sol/DebasePolicy.json';
 
 import { OracleFactory } from '../type/OracleFactory';
 import { DebasePolicy } from '../type/DebasePolicy';

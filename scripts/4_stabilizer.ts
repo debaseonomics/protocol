@@ -1,11 +1,10 @@
-import { run, ethers } from '@nomiclabs/buidler';
+import { run, ethers } from "hardhat";
 
-import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
-import StabilizerPoolArtifact from '../artifacts/StabilizerPool.json';
+import DebasePolicyArtifact from '../artifacts/contracts/flattened/DebasePolicy.sol/DebasePolicy.json';
+import StabilizerPoolArtifact from '../artifacts/contracts/flattened/StabilizerPool.sol/StabilizerPool.json';
 
 import { DebasePolicy } from '../type/DebasePolicy';
 import { StabilizerPool } from '../type/StabilizerPool';
-import { StabilizerPoolFactory } from '../type/StabilizerPoolFactory';
 
 import { promises } from 'fs';
 import { parseEther } from 'ethers/lib/utils';

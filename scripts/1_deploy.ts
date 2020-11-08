@@ -1,15 +1,14 @@
-import { run, ethers } from '@nomiclabs/buidler';
 
-import DegovArtifact from '../artifacts/Degov.json';
-import GovernorAlphaArtifact from '../artifacts/GovernorAlpha.json';
-import TimelockArtifact from '../artifacts/Timelock.json';
+import { run, ethers } from "hardhat";
 
-import StakingPoolArtifact from '../artifacts/StakingPool.json';
-import StabilizerPoolArtifact from '../artifacts/StabilizerPool.json';
-
-import DebaseArtifact from '../artifacts/Debase.json';
-import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
-import OrchestratorArtifact from '../artifacts/Orchestrator.json';
+import DegovArtifact from '../artifacts/contracts/flattened/Degov.sol/Degov.json';
+import GovernorAlphaArtifact from '../artifacts/contracts/flattened/GovernorAlpha.sol/GovernorAlpha.json';
+import TimelockArtifact from '../artifacts/contracts/flattened/Timelock.sol/Timelock.json';
+import StakingPoolArtifact from '../artifacts/contracts/flattened/StakingPool.sol/StakingPool.json';
+import StabilizerPoolArtifact from '../artifacts/contracts/flattened/StabilizerPool.sol/StabilizerPool.json';
+import DebaseArtifact from '../artifacts/contracts/flattened/Debase.sol/Debase.json';
+import DebasePolicyArtifact from '../artifacts/contracts/flattened/DebasePolicy.sol/DebasePolicy.json';
+import OrchestratorArtifact from '../artifacts/contracts/flattened/Orchrestrator.sol/Orchestrator.json';
 
 import { DegovFactory } from '../type/DegovFactory';
 import { GovernorAlphaFactory } from '../type/GovernorAlphaFactory';

@@ -1,12 +1,12 @@
-import { run, ethers } from '@nomiclabs/buidler';
+import { run, ethers } from "hardhat";
 
-import GovernorAlphaArtifact from '../artifacts/GovernorAlpha.json';
-import TimelockArtifact from '../artifacts/Timelock.json';
-import StakingPoolArtifact from '../artifacts/StakingPool.json';
-import DebasePolicyArtifact from '../artifacts/DebasePolicy.json';
-import OrchestratorArtifact from '../artifacts/Orchestrator.json';
-import DegovArtifact from '../artifacts/Degov.json';
-import DebaseArtifact from '../artifacts/Debase.json';
+import DegovArtifact from '../artifacts/contracts/flattened/Degov.sol/Degov.json';
+import GovernorAlphaArtifact from '../artifacts/contracts/flattened/GovernorAlpha.sol/GovernorAlpha.json';
+import TimelockArtifact from '../artifacts/contracts/flattened/Timelock.sol/Timelock.json';
+import StakingPoolArtifact from '../artifacts/contracts/flattened/StakingPool.sol/StakingPool.json';
+import DebaseArtifact from '../artifacts/contracts/flattened/Debase.sol/Debase.json';
+import DebasePolicyArtifact from '../artifacts/contracts/flattened/DebasePolicy.sol/DebasePolicy.json';
+import OrchestratorArtifact from '../artifacts/contracts/flattened/Orchrestrator.sol/Orchestrator.json';
 
 import { Degov } from '../type/Degov';
 import { Debase } from '../type/Debase';
@@ -76,9 +76,9 @@ async function main() {
 		const one_day = 24 * one_hour;
 		const three_days = 3 * one_day;
 		const one_week = 7 * one_day;
-		const three_weeks = 21 * one_day;
+		const two_weeks = 14 * one_day;
 
-		const rebaseRequiredSupply_ = parseEther('95000');
+		const rebaseRequiredSupply_ = parseEther('33250');
 
 		const debaseDaiPoolParams = {
 			name: 'Debase/DAI Pool', //name
@@ -87,9 +87,6 @@ async function main() {
 			isUniLp: false,
 			orchestrator: orchestrator.address,
 			halvingDuration: one_day,
-			fairDistribution: true,
-			fairDistributionTokenLimit: 10000,
-			fairDistributionTimeLimit: one_day,
 			manualPoolStart: false,
 			startTimeOffset: one_hour
 		};
@@ -100,10 +97,7 @@ async function main() {
 			pairToken: dataParse['dai'], // Stake Token
 			isUniLp: true,
 			orchestrator: orchestrator.address,
-			halvingDuration: three_days,
-			fairDistribution: false,
-			fairDistributionTokenLimit: 0,
-			fairDistributionTimeLimit: 0,
+			halvingDuration: one_day,
 			manualPoolStart: false,
 			startTimeOffset: one_hour
 		};
@@ -111,11 +105,14 @@ async function main() {
 		let transaction = await degov.initialize(degovDaiLpPool.address);
 		await transaction.wait(1);
 
+		//Address of multi sig air drop
 		transaction = await debase.initialize(
 			debaseDaiPool.address,
-			3,
+			1,
 			debaseDaiLpPool.address,
-			7,
+			2.5,
+			"", //Air drop address here
+			6.5,
 			debasePolicy.address,
 			90
 		);
@@ -130,9 +127,6 @@ async function main() {
 			debaseDaiPoolParams.isUniLp,
 			debaseDaiPoolParams.orchestrator, // Orchestrator
 			debaseDaiPoolParams.halvingDuration, // Duration
-			debaseDaiPoolParams.fairDistribution, // Fair flag
-			debaseDaiPoolParams.fairDistributionTokenLimit, // Fair token limit
-			debaseDaiPoolParams.fairDistributionTimeLimit, // Fair token time limit
 			debaseDaiPoolParams.manualPoolStart, // Manual start pool
 			debaseDaiPoolParams.startTimeOffset // Start Time offset
 		);
@@ -143,9 +137,6 @@ async function main() {
 			debaseDaiLpPoolParams.isUniLp,
 			debaseDaiLpPoolParams.orchestrator,
 			debaseDaiLpPoolParams.halvingDuration, // Duration
-			debaseDaiLpPoolParams.fairDistribution, // Fair flag
-			debaseDaiLpPoolParams.fairDistributionTokenLimit, // Fair token limit
-			debaseDaiLpPoolParams.fairDistributionTimeLimit, // Fair token time limit
 			debaseDaiLpPoolParams.manualPoolStart, // Manual start pool
 			debaseDaiLpPoolParams.startTimeOffset // Start Time offset
 		);
@@ -174,9 +165,6 @@ async function main() {
 			degovDaiLpPoolParams.isUniLp,
 			degovDaiLpPoolParams.orchestrator,
 			degovDaiLpPoolParams.halvingDuration, // Duration
-			degovDaiLpPoolParams.fairDistribution, // Fair flag
-			degovDaiLpPoolParams.fairDistributionTokenLimit, // Fair token limit
-			degovDaiLpPoolParams.fairDistributionTimeLimit, // Fair token time limit
 			degovDaiLpPoolParams.manualPoolStart, // Manual start pool
 			degovDaiLpPoolParams.startTimeOffset // Start Time offset
 		);
@@ -192,7 +180,7 @@ async function main() {
 			debaseDaiLpPool.address,
 			degovDaiLpPool.address,
 			rebaseRequiredSupply_,
-			three_weeks
+			two_weeks
 		);
 
 		transaction.wait(1);
