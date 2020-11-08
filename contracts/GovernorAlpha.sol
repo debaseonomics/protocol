@@ -454,7 +454,7 @@ contract GovernorAlpha is Initializable, Ownable {
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(
-            receipt.hasVoted == false,
+            !receipt.hasVoted,
             "GovernorAlpha::_castVote: voter already voted"
         );
         uint256 votes = degov.getPriorVotes(voter, proposal.startBlock);

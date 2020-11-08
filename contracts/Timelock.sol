@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/upgrades/contracts/Initializable.sol";
 
-
 contract Timelock is Initializable, Ownable {
     using SafeMath for uint256;
 
@@ -38,10 +37,9 @@ contract Timelock is Initializable, Ownable {
         uint256 eta_
     );
 
-    
     address public admin;
     address public pendingAdmin;
-    
+
     // The amount of delay after which a delay can a queued can be executed.
     uint256 public delay = 1 days;
     // The the period within which an queued proposal can be executed.
@@ -53,11 +51,7 @@ contract Timelock is Initializable, Ownable {
      * @notice Initializes timelock contract with the address of the governor/admin
      * @param admin_ Address of the timelock admin.
      */
-    function initialize(address admin_)
-        external
-        onlyOwner
-        initializer
-    {
+    function initialize(address admin_) external onlyOwner initializer {
         admin = admin_;
     }
 
@@ -102,7 +96,7 @@ contract Timelock is Initializable, Ownable {
         emit NewAdmin(admin);
     }
 
-    function setPendingAdmin(address pendingAdmin_) public onlyOwner {  
+    function setPendingAdmin(address pendingAdmin_) public onlyOwner {
         pendingAdmin = pendingAdmin_;
 
         emit NewPendingAdmin(pendingAdmin);

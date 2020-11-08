@@ -486,7 +486,7 @@ contract Orchestrator is Ownable, Initializable {
     function rebase() external {
         // Rebase will only be called when 95% of the total supply has been distributed or current time is 3 weeks since the orchestrator was deployed.
         // To stop the rebase from getting stuck if no enough rewards are distributed. This will also start the degov/debase pool reward drops
-        if (rebaseStarted == false) {
+        if (!rebaseStarted) {
             uint256 rewardsDistributed = debaseDaiPool.rewardDistributed().add(
                 debaseDaiLpPool.rewardDistributed()
             );

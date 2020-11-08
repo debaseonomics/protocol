@@ -73,57 +73,95 @@ contract Debase is ERC20, Initializable {
     // it's fully paid.
     mapping(address => mapping(address => uint256)) private _allowedFragments;
 
-    constructor() public ERC20("Debase", "DEBASE", uint8(DECIMALS)) {}
+    constructor() public ERC20("Debase", "DEBASE") {}
+
+    struct DropVariables {
+        uint256 debaseDaiPoolVal;
+        uint256 debaseDaiPoolGons;
+        uint256 debaseDaiLpPoolVal;
+        uint256 debaseDaiLpPoolGons;
+        uint256 airDropperVal;
+        uint256 airDropperGons;
+        uint256 debasePolicyPoolVal;
+        uint256 debasePolicyGons;
+    }
 
     /**
      * @notice Initializes with the policy,Dai,DaiLp pool as parameters. 
                The function then sets the total supply to the initial supply and calculates the gon per fragment. 
                It also sets the value and the gons for both the Dai and DaiLp reward pools.
-     * @param debaseDaiPool_ Address of the Debase Dai pool contract
-     * @param debaseDaiLpPool_ Address of the Debase Dai LP pool contract
-     * @param debasePolicy_ Address of the Debase policy contract
+     * @param debaseDaiPool Address of the Debase Dai pool contract
+     * @param debaseDaiTotalRatio_ Ratio of total supply given to Debase Dai Pool
+     * @param debaseDaiLpPool Address of the Debase Dai Lp pool contract
+     * @param debaseDaiLpTotalRatio_ Ratio of total supply given to Debase Dai Lp Pool
+     * @param airDropper Address of the air dropper
+     * @param airDropperTotalRatio_ Ratio of total supply given to air dropper
+     * @param debasePolicy_ Address of the debase policy
+     * @param debasePolicyTotalRatio_ Ratio of total supply given to debase policy
      */
     function initialize(
-        address debaseDaiPool_,
-        uint256 debaseDaiTotalRatio,
-        address debaseDaiLpPool_,
-        uint256 debaseDaiLpTotalRatio,
+        address debaseDaiPool,
+        uint256 debaseDaiTotalRatio_,
+        address debaseDaiLpPool,
+        uint256 debaseDaiLpTotalRatio_,
+        address airDropper,
+        uint256 airDropperTotalRatio_,
         address debasePolicy_,
-        uint256 debasePolicyTotalRatio
+        uint256 debasePolicyTotalRatio_
     ) external initializer {
         require(
-            debaseDaiTotalRatio.add(debaseDaiLpTotalRatio).add(
-                debasePolicyTotalRatio
-            ) == 100
+            debaseDaiTotalRatio_
+                .add(debaseDaiLpTotalRatio_)
+                .add(airDropperTotalRatio_)
+                .add(debasePolicyTotalRatio_) == 100
         );
+        DropVariables memory instance;
 
         _totalSupply = INITIAL_FRAGMENTS_SUPPLY;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
 
         debasePolicy = debasePolicy_;
 
-        uint256 debaseDaiPoolVal = _totalSupply.mul(debaseDaiTotalRatio).div(
+        instance.debaseDaiPoolVal = _totalSupply.mul(debaseDaiTotalRatio_).div(
             100
         );
-        uint256 debaseDaiPoolGons = debaseDaiPoolVal.mul(_gonsPerFragment);
+        instance.debaseDaiPoolGons = instance.debaseDaiPoolVal.mul(
+            _gonsPerFragment
+        );
 
-        uint256 debaseDaiLpPoolVal = _totalSupply
-            .mul(debaseDaiLpTotalRatio)
+        instance.debaseDaiLpPoolVal = _totalSupply
+            .mul(debaseDaiLpTotalRatio_)
             .div(100);
-        uint256 debaseDaiLpPoolGons = debaseDaiLpPoolVal.mul(_gonsPerFragment);
+        instance.debaseDaiLpPoolGons = instance.debaseDaiLpPoolVal.mul(
+            _gonsPerFragment
+        );
 
-        uint256 debasePolicyPoolVal = _totalSupply
-            .mul(debasePolicyTotalRatio)
+        instance.airDropperVal = _totalSupply.mul(airDropperTotalRatio_).div(
+            100
+        );
+
+        instance.airDropperGons = instance.airDropperVal.mul(_gonsPerFragment);
+
+        instance.debasePolicyPoolVal = _totalSupply
+            .mul(debasePolicyTotalRatio_)
             .div(100);
-        uint256 debasePolicyGons = debasePolicyPoolVal.mul(_gonsPerFragment);
+        instance.debasePolicyGons = instance.debasePolicyPoolVal.mul(
+            _gonsPerFragment
+        );
 
-        _gonBalances[debaseDaiPool_] = debaseDaiPoolGons;
-        _gonBalances[debaseDaiLpPool_] = debaseDaiLpPoolGons;
-        _gonBalances[debasePolicy] = debasePolicyGons;
+        _gonBalances[debaseDaiPool] = instance.debaseDaiPoolGons;
+        _gonBalances[debaseDaiLpPool] = instance.debaseDaiLpPoolGons;
+        _gonBalances[airDropper] = instance.airDropperGons;
+        _gonBalances[debasePolicy] = instance.debasePolicyGons;
 
-        emit Transfer(address(0x0), debaseDaiPool_, debaseDaiPoolVal);
-        emit Transfer(address(0x0), debaseDaiLpPool_, debaseDaiLpPoolVal);
-        emit Transfer(address(0x0), debasePolicy, debasePolicyPoolVal);
+        emit Transfer(address(0x0), debaseDaiPool, instance.debaseDaiPoolVal);
+        emit Transfer(
+            address(0x0),
+            debaseDaiLpPool,
+            instance.debaseDaiLpPoolVal
+        );
+        emit Transfer(address(0x0), airDropper, instance.airDropperVal);
+        emit Transfer(address(0x0), debasePolicy, instance.debasePolicyPoolVal);
     }
 
     /**

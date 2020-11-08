@@ -271,11 +271,6 @@ interface IERC20 {
     function totalSupply() external view returns (uint256);
 
     /**
-     * @dev Returns the amount of decimals of the tokens.
-     */
-    function decimals() external view returns (uint8);
-
-    /**
      * @dev Returns the amount of tokens owned by `account`.
      */
     function balanceOf(address account) external view returns (uint256);
@@ -578,14 +573,10 @@ contract ERC20 is Context, IERC20 {
      * All three of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint8 decimals
-    ) public {
+    constructor(string memory name, string memory symbol) public {
         _name = name;
         _symbol = symbol;
-        _decimals = decimals;
+        _decimals = 18;
     }
 
     /**
@@ -616,7 +607,7 @@ contract ERC20 is Context, IERC20 {
      * no way affects any of the arithmetic of the contract, including
      * {IERC20-balanceOf} and {IERC20-transfer}.
      */
-    function decimals() public override view returns (uint8) {
+    function decimals() public view returns (uint8) {
         return _decimals;
     }
 
@@ -848,9 +839,9 @@ contract ERC20 is Context, IERC20 {
     }
 
     /**
-     * @dev Sets `amount` as the allowance of `spender` over the `owner`s tokens.
+     * @dev Sets `amount` as the allowance of `spender` over the `owner` s tokens.
      *
-     * This is internal function is equivalent to `approve`, and can be used to
+     * This internal function is equivalent to `approve`, and can be used to
      * e.g. set automatic allowances for certain subsystems, etc.
      *
      * Emits an {Approval} event.
@@ -1026,7 +1017,7 @@ contract Degov is ERC20, Ownable, Initializable {
     event LogSetQuorumThresholdRatio(uint256 quorumThreshold_);
     event LogSetProposalThresholdRatio(uint256 proposalThreshold_);
 
-    constructor() public ERC20("Degov", "DEGOV", uint8(DECIMALS)) {}
+    constructor() public ERC20("Degov", "DEGOV") {}
 
     /**
      * @notice Initialize the token with policy address and pool for the token distribution

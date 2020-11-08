@@ -65,7 +65,7 @@ contract Degov is ERC20, Ownable, Initializable {
     event LogSetQuorumThresholdRatio(uint256 quorumThreshold_);
     event LogSetProposalThresholdRatio(uint256 proposalThreshold_);
 
-    constructor() public ERC20("Degov", "DEGOV", uint8(DECIMALS)) {}
+    constructor() public ERC20("Degov", "DEGOV") {}
 
     /**
      * @notice Initialize the token with policy address and pool for the token distribution
@@ -73,7 +73,6 @@ contract Degov is ERC20, Ownable, Initializable {
      */
     function initialize(address degovDaiLpPool_) external initializer {
         _mint(degovDaiLpPool_, TOTAL_SUPPLY);
-
     }
 
     /**

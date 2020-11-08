@@ -207,11 +207,6 @@ interface IERC20 {
     function totalSupply() external view returns (uint256);
 
     /**
-     * @dev Returns the amount of decimals of the tokens.
-     */
-    function decimals() external view returns (uint8);
-
-    /**
      * @dev Returns the amount of tokens owned by `account`.
      */
     function balanceOf(address account) external view returns (uint256);
@@ -704,7 +699,7 @@ abstract contract IRewardDistributionRecipient {
         _;
     }
 
-    function setRewardDistribution(address _rewardDistribution) public {
+    function setRewardDistribution(address _rewardDistribution) external {
         rewardDistribution = _rewardDistribution;
     }
 }
@@ -748,6 +743,8 @@ contract StakingPool is
     LPTokenWrapper,
     IRewardDistributionRecipient
 {
+    using Address for address;
+
     string public poolName;
     IERC20 public rewardToken;
     address public orchestrator;
@@ -764,9 +761,6 @@ contract StakingPool is
     uint256 public rewardPerTokenStored;
     uint256 public rewardDistributed;
 
-    uint256 public fairDistributionTokenLimit;
-    uint256 public fairDistributionTimeLimit;
-    bool public isFairDistribution;
     address constant uniFactory = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
 
     mapping(address => uint256) public userRewardPerTokenPaid;
@@ -791,7 +785,7 @@ contract StakingPool is
 
     modifier checkStart() {
         if (manualStartPool) {
-            require(poolStarted == true, "Orchestrator hasn't started pool");
+            require(poolStarted, "Orchestrator hasn't started pool");
         } else {
             require(
                 block.timestamp > startTime,
@@ -841,9 +835,6 @@ contract StakingPool is
         bool isUniPair,
         address orchestrator_,
         uint256 duration_,
-        bool isFairDistribution_,
-        uint256 fairDistributionTokenLimit_,
-        uint256 fairDistributionTimeLimit_,
         bool manualStartPool_,
         uint256 oracleStartTimeOffset
     ) public initializer {
@@ -859,9 +850,6 @@ contract StakingPool is
         maxReward = rewardToken.balanceOf(address(this));
         duration = duration_;
 
-        isFairDistribution = isFairDistribution_;
-        fairDistributionTokenLimit = fairDistributionTokenLimit_;
-        fairDistributionTimeLimit = fairDistributionTimeLimit_;
         manualStartPool = manualStartPool_;
 
         if (!manualStartPool) {
@@ -872,7 +860,7 @@ contract StakingPool is
 
     function startPool() external {
         require(msg.sender == address(orchestrator));
-        require(poolStarted == false, "Pool can only be started once");
+        require(!poolStarted, "Pool can only be started once");
 
         poolStarted = true;
         startTime = block.timestamp + 1;
@@ -914,18 +902,13 @@ contract StakingPool is
         checkHalve
         checkStart
     {
+        require(
+            !address(msg.sender).isContract(),
+            "Caller must not be a contract"
+        );
         require(amount > 0, "Cannot stake 0");
         super.stake(amount);
         emit Staked(msg.sender, amount);
-
-        if (isFairDistribution) {
-            require(
-                balanceOf(msg.sender) <=
-                    fairDistributionTokenLimit * uint256(10)**y.decimals() ||
-                    block.timestamp >= startTime.add(fairDistributionTimeLimit),
-                "Can't stake more than distribution limit"
-            );
-        }
     }
 
     function withdraw(uint256 amount)

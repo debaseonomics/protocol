@@ -207,11 +207,6 @@ interface IERC20 {
     function totalSupply() external view returns (uint256);
 
     /**
-     * @dev Returns the amount of decimals of the tokens.
-     */
-    function decimals() external view returns (uint8);
-
-    /**
      * @dev Returns the amount of tokens owned by `account`.
      */
     function balanceOf(address account) external view returns (uint256);
@@ -795,7 +790,7 @@ abstract contract IRewardDistributionRecipient is Ownable {
         _;
     }
 
-    function setRewardDistribution(address _rewardDistribution) public {
+    function setRewardDistribution(address _rewardDistribution) external {
         rewardDistribution = _rewardDistribution;
     }
 }
@@ -839,6 +834,8 @@ contract StabilizerPool is
     LPTokenWrapper,
     IRewardDistributionRecipient
 {
+    using Address for address;
+
     event LogCountThreshold(uint256 countThreshold_);
     event LogBeforePeriodFinish(bool beforePeriodFinish_);
     event LogCountInSequence(bool CountInSequence_);
@@ -881,7 +878,7 @@ contract StabilizerPool is
     mapping(address => uint256) public rewards;
 
     modifier checkStart() {
-        require(poolEnabled == true, "Orchestrator hasn't started pool");
+        require(poolEnabled, "Orchestrator hasn't started pool");
         _;
     }
 
@@ -1042,6 +1039,10 @@ contract StabilizerPool is
         updateReward(msg.sender)
         checkStart
     {
+        require(
+            !address(msg.sender).isContract(),
+            "Caller must not be a contract"
+        );
         require(amount > 0, "Cannot stake 0");
         super.stake(amount);
         emit Staked(msg.sender, amount);

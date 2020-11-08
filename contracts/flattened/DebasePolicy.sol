@@ -642,10 +642,10 @@ contract DebasePolicy is Ownable, Initializable {
         defaultPositiveRebaseLag = 30;
         defaultNegativeRebaseLag = 30;
 
-        minRebaseTimeIntervalSec = 5 minutes;
+        minRebaseTimeIntervalSec = 24 hours;
         lastRebaseTimestampSec = 0;
-        rebaseWindowOffsetSec = 0;
-        rebaseWindowLengthSec = 3 minutes;
+        rebaseWindowOffsetSec = 72000;
+        rebaseWindowLengthSec = 15 minutes;
 
         priceTargetRate = 10**DECIMALS;
 
@@ -674,7 +674,7 @@ contract DebasePolicy is Ownable, Initializable {
     {
         StabilizerPool memory instanceToDelete = stabilizerPools[index];
         require(
-            instanceToDelete.enabled == false,
+            !instanceToDelete.enabled,
             "Only a disabled pool can be deleted"
         );
         uint256 length = stabilizerPools.length.sub(1);
@@ -812,7 +812,7 @@ contract DebasePolicy is Ownable, Initializable {
         int256 lag;
         int256 supplyDeltaAbs = supplyDelta_.abs();
 
-        if (useDefaultRebaseLag == false) {
+        if (!useDefaultRebaseLag) {
             if (supplyDelta_ < 0) {
                 lag = findBreakpoint(supplyDeltaAbs, lowerLagBreakpoints);
             } else {
