@@ -1,4 +1,4 @@
-import { run, ethers } from "hardhat";
+import { run, ethers } from 'hardhat';
 
 import DegovArtifact from '../artifacts/contracts/flattened/Degov.sol/Degov.json';
 import GovernorAlphaArtifact from '../artifacts/contracts/flattened/GovernorAlpha.sol/GovernorAlpha.json';
@@ -6,6 +6,7 @@ import TimelockArtifact from '../artifacts/contracts/flattened/Timelock.sol/Time
 import DebasePolicyArtifact from '../artifacts/contracts/flattened/DebasePolicy.sol/DebasePolicy.json';
 import OrchestratorArtifact from '../artifacts/contracts/flattened/Orchrestrator.sol/Orchestrator.json';
 import StabilizerPoolArtifact from '../artifacts/contracts/flattened/StabilizerPool.sol/StabilizerPool.json';
+import moduleName from '../artifacts/contracts/flattened/Oracle.sol/Oracle.json';
 
 import { Degov } from '../type/Degov';
 import { GovernorAlpha } from '../type/GovernorAlpha';
@@ -13,6 +14,7 @@ import { StabilizerPool } from '../type/StabilizerPool';
 import { Timelock } from '../type/Timelock';
 import { DebasePolicy } from '../type/DebasePolicy';
 import { Orchestrator } from '../type/Orchestrator';
+import { Oracle } from '../type/Oracle';
 import { promises } from 'fs';
 
 async function main() {
@@ -51,12 +53,19 @@ async function main() {
 			signer[0]
 		)) as any) as StabilizerPool;
 
-		await timelock.transferOwnership(timelock.address);
-		await degov.transferOwnership(timelock.address);
-		await governorAlpha.transferOwnership(timelock.address);
-		await debasePolicy.transferOwnership(timelock.address);
-		await orchestrator.transferOwnership(timelock.address);
-		await stabilizerPool.transferOwnership(timelock.address);
+		const oracle = ((await ethers.getContractAt(
+			OrchestratorArtifact.abi,
+			dataParse['oracle'],
+			signer[0]
+		)) as any) as Oracle;
+
+		await timelock.transferOwnership('0xf038C1cfaDAce2C0E5963Ab5C0794B9575e1D2c2');
+		await degov.transferOwnership('0xf038C1cfaDAce2C0E5963Ab5C0794B9575e1D2c2');
+		await governorAlpha.transferOwnership('0xf038C1cfaDAce2C0E5963Ab5C0794B9575e1D2c2');
+		await debasePolicy.transferOwnership('0xf038C1cfaDAce2C0E5963Ab5C0794B9575e1D2c2');
+		await orchestrator.transferOwnership('0xf038C1cfaDAce2C0E5963Ab5C0794B9575e1D2c2');
+		await stabilizerPool.transferOwnership('0xf038C1cfaDAce2C0E5963Ab5C0794B9575e1D2c2');
+		await oracle.transferOwnership('0xf038C1cfaDAce2C0E5963Ab5C0794B9575e1D2c2');
 	} catch (error) {
 		console.log(error);
 	}
