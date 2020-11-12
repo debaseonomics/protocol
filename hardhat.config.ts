@@ -16,6 +16,9 @@ const config: HardhatUserConfig = {
 	paths: {
 		sources: './contracts/flattened'
 	},
+	etherscan: {
+		apiKey: 'WSEBKEYQAFZ8AUGMFAKJR7GPCNYZ9Q3AIE'
+	},
 	typechain: {
 		outDir: './type',
 		target: 'ethers-v5'

@@ -1,4 +1,4 @@
-import { run, ethers } from "hardhat";
+import { run, ethers } from 'hardhat';
 
 import DegovArtifact from '../artifacts/contracts/flattened/Degov.sol/Degov.json';
 import GovernorAlphaArtifact from '../artifacts/contracts/flattened/GovernorAlpha.sol/GovernorAlpha.json';
@@ -73,12 +73,12 @@ async function main() {
 		)) as any) as Orchestrator;
 
 		const one_hour = 60 * 60;
+		const twelve_hours = 12 * one_hour;
 		const one_day = 24 * one_hour;
-		const three_days = 3 * one_day;
 		const one_week = 7 * one_day;
 		const two_weeks = 14 * one_day;
 
-		const rebaseRequiredSupply_ = parseEther('33250');
+		const rebaseRequiredSupply_ = parseEther('28500');
 
 		const debaseDaiPoolParams = {
 			name: 'Debase/DAI Pool', //name
@@ -88,7 +88,7 @@ async function main() {
 			orchestrator: orchestrator.address,
 			halvingDuration: one_day,
 			manualPoolStart: false,
-			startTimeOffset: one_hour
+			startTimeOffset: twelve_hours
 		};
 
 		const debaseDaiLpPoolParams = {
@@ -99,7 +99,7 @@ async function main() {
 			orchestrator: orchestrator.address,
 			halvingDuration: one_day,
 			manualPoolStart: false,
-			startTimeOffset: one_hour
+			startTimeOffset: twelve_hours
 		};
 
 		let transaction = await degov.initialize(degovDaiLpPool.address);
@@ -110,9 +110,9 @@ async function main() {
 			debaseDaiPool.address,
 			1,
 			debaseDaiLpPool.address,
-			2.5,
-			"", //Air drop address here
-			6.5,
+			2,
+			'0x6dbbc75f2951B826730ac1b2B774C5dEC941A860',
+			7,
 			debasePolicy.address,
 			90
 		);
@@ -151,9 +151,6 @@ async function main() {
 			isUniLp: false,
 			orchestrator: orchestrator.address,
 			halvingDuration: one_week,
-			fairDistribution: false,
-			fairDistributionTokenLimit: 0,
-			fairDistributionTimeLimit: 0,
 			manualPoolStart: true,
 			startTimeOffset: 0
 		};
