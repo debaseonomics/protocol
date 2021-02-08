@@ -13,9 +13,6 @@ const config: HardhatUserConfig = {
 			}
 		}
 	},
-	paths: {
-		sources: './contracts/flattened'
-	},
 	etherscan: {
 		apiKey: 'WSEBKEYQAFZ8AUGMFAKJR7GPCNYZ9Q3AIE'
 	},

@@ -112,7 +112,7 @@ contract ExampleOracleSimple {
     }
 }
 
-contract Oracle is Ownable, ExampleOracleSimple {
+contract OracleV2 is Ownable, ExampleOracleSimple {
     address debase;
     address public debasePolicy;
     uint256 constant SCALE = 10**18;
